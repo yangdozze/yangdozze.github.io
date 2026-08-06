@@ -1,0 +1,33 @@
+name: Publish WaveDrop installer
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/publish-installer.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download installer artifact
+        run: |
+          curl -L --fail --retry 3 \
+            "https://sdmntprwestus3.oaiusercontent.com/files/00000000-9cc0-81fd-81ae-7977e8372b5e/raw?se=2026-08-06T09%3A37%3A57Z&sp=r&sv=2026-02-06&sr=b&scid=6e525779-ca7f-5c88-ac99-5c2ff35ff773&skoid=c69179d1-5b5d-430f-afa3-b9bdcf9d6497&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-08-06T05%3A48%3A44Z&ske=2026-08-07T05%3A48%3A44Z&sks=b&skv=2026-02-06&sig=YcE9mTwSp5GAeN9b1mTL%2B1ovl7LhQ5LigixCX24tndM%3D" \
+            -o installer.zip
+          unzip -o installer.zip
+          test -f WaveDropStudio-Setup-v0.3.3-Windows-x64.exe
+
+      - name: Create public release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete v0.3.3 --yes || true
+          gh release create v0.3.3 \
+            WaveDropStudio-Setup-v0.3.3-Windows-x64.exe \
+            --title "WaveDrop Studio v0.3.3" \
+            --notes "Public Windows x64 installer for WaveDrop Studio."
