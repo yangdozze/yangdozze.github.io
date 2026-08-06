@@ -17,27 +17,88 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Add enhancement assets to pages
+
+      - name: Add enhancement assets and verification copy
         shell: python
         run: |
           from pathlib import Path
 
           css = '<link rel="stylesheet" href="assets/site-enhancements.css"/>'
           js = '<script src="assets/site-enhancements.js" defer></script>'
+
+          old_heading = '<h1>From finished beat<br/>to published video.</h1>'
+          new_heading = (
+              '<h1>WaveDrop Studio</h1>'
+              '<p class="hero-copy" style="margin-bottom:14px;color:#f7f7fb;font-weight:650">'
+              'From finished beat to published video.'</n              'p>'
+          )
+
+          old_copy = (
+              '<p class="hero-copy">WaveDrop Studio is a Windows desktop app for preparing beat videos, '
+              'reusable metadata, release schedules, and direct YouTube uploads in one focused workflow.</p>'
+          )
+          new_copy = (
+              '<p class="hero-copy">WaveDrop Studio is a Windows desktop application for independent '
+              'beatmakers. It combines a beat audio file and cover image into a YouTube-ready video, helps '
+              'prepare titles, descriptions and tags, detects BPM and key from filenames, supports release '
+              'planning, and uploads to the user\'s own YouTube channel only after explicit review and approval.</p>'
+          )
+
+          purpose_panel = (
+              '<section class="youtube-panel" id="about-wavedrop-studio">'
+              '<div><span class="panel-kicker">Application purpose</span>'
+              '<h2>What WaveDrop Studio does.</h2>'
+              '<p><strong>WaveDrop Studio</strong> is a Windows desktop publishing tool for music creators. '
+              'Users select their own beat and cover art, generate a video without intentionally changing the '
+              'source audio quality, prepare reusable release metadata, connect their own YouTube channel through '
+              'Google OAuth, and start an upload only by clicking the publishing action themselves.</p></div>'
+              '<ol>'
+              '<li><b>1</b><span><strong>Create a video</strong>Combine user-provided audio and cover art.</span></li>'
+              '<li><b>2</b><span><strong>Prepare metadata</strong>Review titles, descriptions, tags, BPM and key.</span></li>'
+              '<li><b>3</b><span><strong>Connect YouTube</strong>Authorize the user\'s own channel with Google OAuth.</span></li>'
+              '<li><b>4</b><span><strong>Upload by choice</strong>No upload starts without an explicit user action.</span></li>'
+              '</ol></section>'
+          )
+
+          meta = (
+              '<meta name="application-name" content="WaveDrop Studio"/>'
+              '<meta property="og:title" content="WaveDrop Studio"/>'
+              '<meta property="og:description" content="Windows desktop application for creating beat videos, preparing release metadata, and uploading user-approved videos to the user’s own YouTube channel."/>'
+              '<script type="application/ld+json">'
+              '{"@context":"https://schema.org","@type":"SoftwareApplication","name":"WaveDrop Studio",'
+              '"applicationCategory":"MultimediaApplication","operatingSystem":"Windows 10, Windows 11",'
+              '"description":"WaveDrop Studio is a Windows desktop application for independent beatmakers to create YouTube-ready videos from their own audio and cover art, prepare release metadata, and upload to their own YouTube channel after explicit review and approval."}'
+              '</script>'
+          )
+
           for name in ('index.html', '404.html'):
               path = Path(name)
               if not path.exists():
                   continue
+
               text = path.read_text(encoding='utf-8')
+
               if 'site-enhancements.css' not in text:
                   text = text.replace('</head>', css + '</head>')
               if 'site-enhancements.js' not in text:
                   text = text.replace('</body>', js + '</body>')
+
+              if 'name="application-name"' not in text:
+                  text = text.replace('</head>', meta + '</head>')
+
+              text = text.replace(old_heading, new_heading)
+              text = text.replace(old_copy, new_copy)
+
+              if 'id="about-wavedrop-studio"' not in text:
+                  marker = '</section><section class="section" id="features">'
+                  text = text.replace(marker, '</section>' + purpose_panel + '<section class="section" id="features">', 1)
+
               path.write_text(text, encoding='utf-8')
+
       - name: Commit changes
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add index.html 404.html
-          git diff --cached --quiet || git commit -m "Add icons and direct installer download"
+          git diff --cached --quiet || git commit -m "Clarify app name and purpose for Google verification"
           git push
