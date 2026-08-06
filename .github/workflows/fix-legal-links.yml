@@ -1,0 +1,54 @@
+name: Fix legal page links
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - privacy.html
+      - terms.html
+      - .github/workflows/fix-legal-links.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fix-links:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Replace legacy preview URLs
+        shell: python
+        run: |
+          from pathlib import Path
+
+          old = 'https://wavedrop-studio.alexchezy211.chatgpt.site'
+          replacements = [
+              (old + '/assets/', 'assets/'),
+              (old + '/privacy', 'privacy.html'),
+              (old + '/terms', 'terms.html'),
+              (old + '/', 'index.html'),
+          ]
+
+          for name in ('privacy.html', 'terms.html'):
+              path = Path(name)
+              text = path.read_text(encoding='utf-8')
+              for source, target in replacements:
+                  text = text.replace(source, target)
+              text = text.replace('privacy.html#features', 'index.html#features')
+              text = text.replace('terms.html#features', 'index.html#features')
+
+              canonical = f'<link rel="canonical" href="https://wavedropstudio.ru/{name}"/>'
+              if 'rel="canonical"' not in text:
+                  text = text.replace('</head>', canonical + '</head>', 1)
+
+              path.write_text(text, encoding='utf-8')
+
+      - name: Commit corrected legal links
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add privacy.html terms.html
+          git diff --cached --quiet || git commit -m "Point legal pages to wavedropstudio.ru"
+          git push
