@@ -1,0 +1,33 @@
+name: Audit live site
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/audit-live-site.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Audit public pages
+        shell: bash
+        run: |
+          set -euo pipefail
+          base='https://yangdozze.github.io'
+          for path in '/' '/privacy.html' '/terms.html' '/googlef040548dcc0e4358.html'; do
+            url="${base}${path}"
+            echo "===== ${url} ====="
+            curl -sSIL --max-time 30 "$url" | sed -n '1,20p'
+            echo '--- BODY CHECKS ---'
+            body="$(curl -sSL --max-time 30 "$url")"
+            printf '%s' "$body" | grep -F 'WaveDrop Studio' >/dev/null && echo 'HAS_APP_NAME=yes' || echo 'HAS_APP_NAME=no'
+            printf '%s' "$body" | grep -F 'Windows desktop application for independent beatmakers' >/dev/null && echo 'HAS_PURPOSE_TEXT=yes' || echo 'HAS_PURPOSE_TEXT=no'
+            printf '%s' "$body" | grep -F 'privacy.html' >/dev/null && echo 'HAS_PRIVACY_LINK=yes' || echo 'HAS_PRIVACY_LINK=no'
+            printf '%s' "$body" | grep -F 'google-site-verification: googlef040548dcc0e4358.html' >/dev/null && echo 'HAS_VERIFICATION_TEXT=yes' || echo 'HAS_VERIFICATION_TEXT=no'
+            echo
+          done
