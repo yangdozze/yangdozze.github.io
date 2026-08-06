@@ -1,0 +1,43 @@
+name: Inject site enhancements
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - assets/site-enhancements.css
+      - assets/site-enhancements.js
+      - .github/workflows/inject-site-enhancements.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  inject:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Add enhancement assets to pages
+        shell: python
+        run: |
+          from pathlib import Path
+
+          css = '<link rel="stylesheet" href="assets/site-enhancements.css"/>'
+          js = '<script src="assets/site-enhancements.js" defer></script>'
+          for name in ('index.html', '404.html'):
+              path = Path(name)
+              if not path.exists():
+                  continue
+              text = path.read_text(encoding='utf-8')
+              if 'site-enhancements.css' not in text:
+                  text = text.replace('</head>', css + '</head>')
+              if 'site-enhancements.js' not in text:
+                  text = text.replace('</body>', js + '</body>')
+              path.write_text(text, encoding='utf-8')
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html 404.html
+          git diff --cached --quiet || git commit -m "Add icons and direct installer download"
+          git push
