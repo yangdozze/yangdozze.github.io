@@ -30,7 +30,7 @@ jobs:
           new_heading = (
               '<h1>WaveDrop Studio</h1>'
               '<p class="hero-copy" style="margin-bottom:14px;color:#f7f7fb;font-weight:650">'
-              'From finished beat to published video.'</n              'p>'
+              'From finished beat to published video.</p>'
           )
 
           old_copy = (
