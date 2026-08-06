@@ -26,8 +26,9 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release delete v0.3.3 --yes || true
+          gh release delete v0.3.3 --repo "$GITHUB_REPOSITORY" --yes || true
           gh release create v0.3.3 \
             WaveDropStudio-Setup-v0.3.3-Windows-x64.exe \
+            --repo "$GITHUB_REPOSITORY" \
             --title "WaveDrop Studio v0.3.3" \
             --notes "Public Windows x64 installer for WaveDrop Studio."
