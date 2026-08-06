@@ -1,0 +1,70 @@
+name: Mirror WaveDrop Studio site
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/mirror-chatgpt-site.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download published site
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf publish
+          mkdir -p publish
+
+          wget \
+            --mirror \
+            --page-requisites \
+            --convert-links \
+            --adjust-extension \
+            --no-parent \
+            --no-host-directories \
+            --directory-prefix=publish \
+            https://wavedrop-studio.alexchezy211.chatgpt.site/
+
+          # Fetch the known legal routes explicitly in case the site uses client-side navigation.
+          for route in privacy privacy-policy terms terms-of-service; do
+            wget \
+              --page-requisites \
+              --convert-links \
+              --adjust-extension \
+              --no-parent \
+              --no-host-directories \
+              --directory-prefix=publish \
+              "https://wavedrop-studio.alexchezy211.chatgpt.site/${route}" || true
+          done
+
+          test -f publish/index.html
+          touch publish/.nojekyll
+          test -f publish/404.html || cp publish/index.html publish/404.html
+
+          echo "Mirrored files:"
+          find publish -maxdepth 4 -type f -printf '%P\n' | sort
+
+      - name: Publish mirrored files to gh-pages branch
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          cd publish
+          git init
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b gh-pages
+          git add -A
+          git commit -m "Mirror WaveDrop Studio site"
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git push --force origin gh-pages
