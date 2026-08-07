@@ -78,6 +78,11 @@ jobs:
 
               text = path.read_text(encoding='utf-8')
 
+              # Google requires the product name on the homepage to match the OAuth app name.
+              # Keep the document title exact as well as the visible H1 and structured metadata.
+              text = text.replace('<title>WaveDrop Studio — Beat Publishing for Windows</title>', '<title>WaveDrop Studio</title>')
+              text = text.replace('<title>WaveDrop Studio - Beat Publishing for Windows</title>', '<title>WaveDrop Studio</title>')
+
               if 'site-enhancements.css' not in text:
                   text = text.replace('</head>', css + '</head>')
               if 'site-enhancements.js' not in text:
@@ -100,5 +105,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add index.html 404.html
-          git diff --cached --quiet || git commit -m "Clarify app name and purpose for Google verification"
+          git diff --cached --quiet || git commit -m "Match homepage name exactly to WaveDrop Studio"
           git push
