@@ -1,0 +1,86 @@
+name: Build Palmier Pro for Windows
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/build-palmier-windows.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Windows x64 installer
+    runs-on: windows-2025
+    timeout-minutes: 180
+
+    steps:
+      - name: Check out Windows port
+        uses: actions/checkout@v4
+        with:
+          repository: hrashdan/palmier-pro
+          ref: 5a0348e16608e42f0fa3f000e476d66c9119e603
+          path: source
+          fetch-depth: 1
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Set up MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Restore pinned FFmpeg
+        shell: pwsh
+        working-directory: source/platforms/windows
+        run: ./scripts/ci-restore-ffmpeg.ps1
+
+      - name: Build native engine
+        shell: pwsh
+        working-directory: source/platforms/windows
+        run: msbuild src/PalmierPro.Rendering/native/PalmierEngine.vcxproj -p:Configuration=Release -p:Platform=x64 -nologo -verbosity:minimal
+
+      - name: Restore managed dependencies
+        shell: pwsh
+        working-directory: source/platforms/windows
+        run: dotnet restore PalmierPro.sln
+
+      - name: Build managed solution
+        shell: pwsh
+        working-directory: source/platforms/windows
+        run: dotnet build PalmierPro.sln -c Release --no-restore -p:Platform=x64
+
+      - name: Run non-GPU tests
+        shell: pwsh
+        working-directory: source/platforms/windows
+        run: dotnet test PalmierPro.sln -c Release --no-build --logger trx --filter "Category!=GPU"
+
+      - name: Build self-contained installer
+        shell: pwsh
+        working-directory: source/platforms/windows
+        run: ./scripts/build-installer.ps1
+
+      - name: Generate SHA-256 checksum
+        shell: pwsh
+        working-directory: source/platforms/windows
+        run: |
+          $installer = Get-ChildItem artifacts/installer/PalmierProSetup-*.exe | Select-Object -First 1
+          if (-not $installer) { throw "Installer was not produced." }
+          $hash = (Get-FileHash $installer.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  $($installer.Name)" | Set-Content artifacts/installer/SHA256SUMS.txt -NoNewline
+          Get-Item $installer.FullName | Format-List Name,Length,LastWriteTime
+          Get-Content artifacts/installer/SHA256SUMS.txt
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: PalmierPro-Windows-x64
+          path: |
+            source/platforms/windows/artifacts/installer/PalmierProSetup-*.exe
+            source/platforms/windows/artifacts/installer/SHA256SUMS.txt
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
