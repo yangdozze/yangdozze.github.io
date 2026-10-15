@@ -1,5 +1,5 @@
 /* METHOD / HiveGlobal — original CausticAdapter, copied from METHOD app by permission relayed by this project's owner. Keep attribution, and preserve original default parameters and render size. */
-import {CAUSTIC} from './caustic-core.js';
+import {CAUSTIC} from './caustic-core.js?v=m20261016c';
 const f2 = v => Number(v).toFixed(2);
 const CausticAdapter={
   id:'caustic', num:'03', name:'Bleach', tag:'Field', cost:'cpu',   // CPU raster: fixed 540 x 960, no HQ step
