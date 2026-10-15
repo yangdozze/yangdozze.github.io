@@ -124,3 +124,41 @@ body.immersive-on{overflow:hidden}
  .stage:fullscreen canvas,.stage.immersive canvas{width:min(100vw,56.25dvh)!important;height:auto!important}
 }
 @media (max-width:355px){.full-controls{left:7px;right:7px;padding:8px;gap:6px}.full-controls span{font-size:10px}}
+
+/* v7: phone-first controls, safe-area padding; overrides inherited experimental rules. */
+:root{color-scheme:light}
+#toast{position:fixed!important;bottom:calc(76px + env(safe-area-inset-bottom))!important;z-index:4000;max-width:min(94vw,440px)}
+.style-queue>.look{min-width:0;overflow:hidden}
+.look-name{white-space:normal;overflow-wrap:anywhere;font-size:12px!important}
+.look-name small{font-size:10px!important}
+input,select,button{touch-action:manipulation}
+@media(max-width:760px){
+ html,body{width:100%;max-width:100%;overflow-x:clip}
+ main{display:flex;flex-direction:column;gap:19px;padding:12px 12px calc(42px + env(safe-area-inset-bottom))}
+ header{margin:0 12px;padding:12px 0;gap:8px;min-height:68px;height:auto}
+ .brand{font-size:clamp(20px,6vw,26px);min-width:0;letter-spacing:-1px}
+ .header-right .local{display:none}
+ .header-right{gap:6px}
+ .header-right button{min-height:40px;padding:8px;font-size:11px}
+ .stage-column{position:static!important;top:auto!important;min-width:0}
+ .overline{font-size:10px!important}
+ .stage-wrap{padding:4px!important;height:auto!important;min-height:0!important}
+ .stage{width:100%!important;height:auto!important;max-width:100%!important;aspect-ratio:auto!important;display:flex;justify-content:center;align-items:center}
+ .stage canvas{width:100%;height:auto;aspect-ratio:9/16}
+ .transport{display:flex;align-items:center;gap:6px;min-height:48px}
+ .transport .small{min-width:42px!important;min-height:44px!important;font-size:16px!important}
+ .transport #seek{flex:1;min-width:24px}
+ .transport #clock{font-size:11px}
+ aside{width:100%;min-width:0}
+ .panel{padding:22px 0}
+ .style-queue{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:9px}
+ .style-queue>.look{min-width:0!important;max-width:none!important;width:100%!important;flex:none!important;padding:8px!important}
+ .style-queue .look canvas{width:100%;height:auto;aspect-ratio:9/16}
+ .row.three{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+ .row.three label{min-width:0;font-size:11px!important;overflow-wrap:anywhere}
+ .row.three input,.row.three select{max-width:100%;min-width:0;font-size:12px!important}
+ .full-controls{bottom:calc(env(safe-area-inset-bottom) + 16px)}
+ .stage.immersive,.stage:fullscreen{height:100dvh!important;width:100vw!important;max-width:none!important;aspect-ratio:auto!important}
+ .stage.immersive canvas,.stage:fullscreen canvas{max-height:100dvh!important;width:min(100vw,56.25dvh)!important;aspect-ratio:9/16!important}
+}
+@media(max-width:370px){.style-queue{grid-template-columns:repeat(2,minmax(0,1fr))!important}.brand span:last-child{font-size:8px}}
