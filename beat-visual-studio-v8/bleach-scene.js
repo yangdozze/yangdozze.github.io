@@ -9,6 +9,7 @@
  */
 import {CausticAdapter} from './method-caustic-adapter.js';
 import {CAUSTIC} from './caustic-core.js';
+import {drawMethodTrackerHUD} from './method-tracker-hud.js';
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 const renderers=new WeakMap();
 let audio=null,sourceVersion=0;
@@ -92,6 +93,7 @@ export function renderBleach(ctx,w,h,t,settings={},data={},thumb=false){
     // The live preview is not redrawn at duplicate timestamps.
     if(!settings.exportMode && v.lastTime>=0 && Math.abs(at-v.lastTime)<(thumb?1/10:1/40)){
       ctx.drawImage(v.engine.canvas,0,0,w,h);
+      if(!thumb&&cfg[2]>.02)drawMethodTrackerHUD(ctx,w,h,v.engine.getTrackerState?.());
       ctx.restore();return;
     }
     // CAUSTIC.U and the original adapter are singleton-scope parameters.
@@ -116,13 +118,15 @@ export function renderBleach(ctx,w,h,t,settings={},data={},thumb=false){
     ctx.imageSmoothingEnabled=true;
     ctx.imageSmoothingQuality='high';
     ctx.drawImage(v.engine.canvas,0,0,w,h);
+    const trackerState=!thumb?v.engine.getTrackerState?.():null;
+    const visibleHUD=(!thumb&&cfg[2]>.02)?drawMethodTrackerHUD(ctx,w,h,trackerState):0;
     if(!thumb&&typeof window!=='undefined'){
       window.__BLEACH_FRAME_DEBUG__={
         engine:'METHOD Caustic original adapter',look,sourceVersion,time:at,
         nativeRaster:[v.engine.canvas.width,v.engine.canvas.height],
         tracker:cfg[2],displacement:cfg[0],speed:cfg[1],
         rasterHashSource:'METHOD',
-        hasAudio:true
+        hasAudio:true,trackerCount:trackerState?.tracks?.length||0,visibleHUD
       };
     }
   }catch(err){
