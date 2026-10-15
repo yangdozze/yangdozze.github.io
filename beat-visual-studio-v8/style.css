@@ -186,3 +186,22 @@ input,select,button{touch-action:manipulation}
  .style-queue>.look{min-height:70px}
  .stage-column .overline{font-size:10px!important}
 }
+
+/* METHOD / 03 Bleach. Controls retain source terminology and values. */
+.method-panel[hidden]{display:none!important}
+.method-panel{background:var(--card);border:1px solid var(--line);border-radius:15px;padding:20px;margin-top:10px}
+.method-panel .section-title{padding-bottom:9px}
+.method-panel .hint{font-size:12px;line-height:1.55;margin:10px 0 18px;color:var(--muted)}
+.method-knobs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.method-knobs label{display:flex;flex-direction:column;gap:9px;min-width:0;font-weight:600;font-size:13px}
+.method-knobs output{align-self:flex-end;font-variant-numeric:tabular-nums;font-weight:700;font-size:12px;color:var(--ink)}
+.method-knobs input{width:100%;min-width:0;accent-color:#8969b3;min-height:26px;cursor:pointer}
+.method-origin{display:inline-flex;font-weight:600;color:var(--ink);text-underline-offset:3px;margin-top:4px;font-size:12px}
+@media(max-width:760px){
+ .method-panel{padding:18px 14px;margin:7px 0;border-radius:12px}
+ .method-panel .hint{font-size:12px!important}
+ .method-knobs{gap:15px 13px}
+ .method-knobs label{font-size:13px!important}
+ .method-knobs output{font-size:13px!important}
+ .method-knobs input{min-height:44px}
+}
