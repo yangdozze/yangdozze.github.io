@@ -29,15 +29,19 @@ const CausticAdapter={
   create(){
     let W=540, H=960; const c=document.createElement('canvas'); c.width=W; c.height=H;
     const ctx=c.getContext('2d',{alpha:false}); let R=new CAUSTIC.Ref(W,H), pcm=null, sr=44100;
+    // Original connected-component tracking is unchanged. HUD is composited
+    // at full output resolution rather than subpixel-size in the 540px raster.
+    R.trk.draw=()=>{};
     const OBJ={U:CAUSTIC.U,IN:CAUSTIC.IN,DS:CAUSTIC.DS,TH:CAUSTIC.TH,TK:CAUSTIC.TK};
     return { canvas:c,
+      getTrackerState(){return R.trk;},
       setAudio(p,r){ pcm=p; sr=r; R.clear(); },
       frame(t,dt){ if(pcm) R.render(ctx,W,H,t,pcm,sr,dt); },
       set(k,v){ const p=CausticAdapter.params.find(q=>q.k===k); OBJ[p.o][k]=v; if(p.o==='U') CAUSTIC.applyUser(); },
       setLook(k){ CAUSTIC.U.stage=k; },
       // landscape: the same CPU raster turned on its side (960 x 540); the analysis carries over
       setAspect(a){ const land=a==='16:9'; if((W>H)===land) return; const t=W; W=H; H=t; c.width=W; c.height=H;
-        const old=R; R=new CAUSTIC.Ref(W,H); R.an=old.an; R.anPcm=old.anPcm; R.lastT=old.lastT; },
+        const old=R; R=new CAUSTIC.Ref(W,H); R.an=old.an; R.anPcm=old.anPcm; R.lastT=old.lastT; R.trk.draw=()=>{}; },
     };
   }
 };
