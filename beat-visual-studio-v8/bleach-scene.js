@@ -7,9 +7,9 @@
  * This file handles host audio, mode selection and video canvas scaling.
  * No independently simulated waveforms or fake HUD tracks.
  */
-import {CausticAdapter} from './method-caustic-adapter.js';
-import {CAUSTIC} from './caustic-core.js';
-import {drawMethodTrackerHUD} from './method-tracker-hud.js';
+import {CausticAdapter} from './method-caustic-adapter.js?v=m20261016c';
+import {CAUSTIC} from './caustic-core.js?v=m20261016c';
+import {drawMethodTrackerHUD} from './method-tracker-hud.js?v=m20261016c';
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 const renderers=new WeakMap();
 let audio=null,sourceVersion=0;
