@@ -1,0 +1,25 @@
+<!doctype html><html lang="ru"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>METHOD Tracker A/B Test</title><style>body{font:14px system-ui;background:#f0f0ed;padding:18px;color:#17171c}button{font:inherit;padding:12px;border-radius:10px;border:1px solid #999;background:white}canvas{width:310px;max-width:100%;display:block;background:black}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:white;padding:12px;border-radius:10px}</style>
+<h2>METHOD: настоящие трекеры, пороги яркости</h2><button id="start">Проверить разные пороги</button><b id="status">Готов</b><pre id="log"></pre><canvas id="picture" width="540" height="960"></canvas>
+<script type="module">
+import {CausticAdapter} from './method-caustic-adapter.js';import {CAUSTIC} from './caustic-core.js';
+const txt=document.querySelector('#log'),status=document.querySelector('#status');
+function stats(cv){const p=cv.getContext('2d').getImageData(0,0,540,960).data;
+let max=0,br65=0,br90=0,br140=0,br195=0,colour=0;for(let i=0;i<p.length;i+=4){const r=p[i],g=p[i+1],b=p[i+2],v=Math.max(r,g,b);if(v>max)max=v;if(v>65)br65++;if(v>90)br90++;if(v>140)br140++;if(v>195)br195++;if((Math.abs(r-g)>16||Math.abs(g-b)>16)&&v>45)colour++}return {max,br65,br90,br140,br195,colouredTrackerPixels:colour}}
+document.querySelector('#start').onclick=async()=>{
+ const lines=[],pr=s=>{lines.push(s);txt.textContent=lines.join('\n')};
+ status.textContent='Тестирование...';
+ try{const rate=44100,N=rate*3,p=new Float32Array(N);
+ for(let i=0;i<N;i++){const t=i/rate,k=t%.5;p[i]=Math.tanh((Math.sin(2*Math.PI*(55+60*Math.exp(-k*60))*k)*Math.exp(-k*19)*1.25+Math.sin(i*1.3)*Math.exp(-(t%.25)*80)*.22+Math.sin(2*Math.PI*110*t)*.15)*2);}
+ const cv=document.createElement('canvas');cv.width=540;cv.height=960;
+ const cx=cv.getContext('2d',{alpha:false,willReadFrequently:true});
+ const renderer=new CAUSTIC.Ref(540,960);
+ CAUSTIC.U.stage='disp';CAUSTIC.U.displacement=1;CAUSTIC.U.speed=.97;CAUSTIC.U.tracker=.65;CAUSTIC.applyUser();
+ const A={canvas:cv,frame(t,dt){renderer.render(cx,540,960,t,p,rate,dt);}};
+ for(const threshold of [.767,.55,.40,.30,.20,.12]){
+ CAUSTIC.TK.thr=threshold;const t0=performance.now();A.frame(0.55+threshold*.015,1/30);pr('threshold '+threshold+' time '+Math.round(performance.now()-t0)+'ms '+JSON.stringify({canvas:stats(A.canvas),tracks:renderer.trk.tracks.length,detectedGrid:[...renderer.trk.g].reduce((a,b)=>a+b,0),TK_on:CAUSTIC.TK.on,TK_thr:CAUSTIC.TK.thr,firstTracks:renderer.trk.tracks.slice(0,2).map(t=>({x:t.x,y:t.y,hit:t.hit,age:t.age})),maxLum:Math.max(...renderer.lum.slice(0,1000))}));document.querySelector('#picture').getContext('2d').drawImage(A.canvas,0,0);await new Promise(r=>setTimeout(r,0));
+ }
+ status.textContent='PASS';
+ }catch(e){status.textContent='FAIL';pr(String(e?.stack||e))}
+};
+</script>
