@@ -1,0 +1,118 @@
+<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Beat Visual Studio v8 — Mobile & Audio QA</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font:14px system-ui;background:#e9e9ed;color:#20202a}header{position:sticky;top:0;background:#fff;z-index:10;padding:12px 18px;box-shadow:0 2px 10px #2222}
+h1{font-size:18px;margin:0}p{margin:4px 0 0;color:#6a6570}.tests{display:flex;align-items:flex-start;gap:24px;flex-wrap:wrap;padding:18px}
+.device{width:auto;flex:none;background:#18181c;border:8px solid #18181c;border-radius:28px;overflow:hidden;box-shadow:0 10px 30px #1114}
+.device header{position:static;color:#fff;background:#18181c;box-shadow:none;font-size:12px}
+.device iframe{border:0;display:block;background:#fafafa}.panel{background:#fff;padding:14px;margin:18px;border-radius:12px}
+#report{white-space:pre-wrap;font:12px ui-monospace,monospace;line-height:1.5}
+.status{font-weight:700}button{font:inherit;min-height:42px;border-radius:8px;border:1px solid #aaa;padding:8px 12px;background:#fafafa;cursor:pointer}
+</style></head><body><header><h1>Beat Visual Studio v8 — QA / только тестовый инструмент</h1><p>Внутри отдельных iframe запускается настоящая v8 с мобильными viewport 390×844 и 320×700. Основной сайт не изменяется.</p></header>
+<section class="tests">
+<div class="device"><header>iPhone width · 390×844</header><iframe id="phone390" title="390px viewport" width="390" height="844" src="./?qa=390"></iframe></div>
+<div class="device"><header>Narrow phone · 320×700</header><iframe id="phone320" title="320px viewport" width="320" height="700" src="./?qa=320"></iframe></div>
+</section>
+<div class="panel"><button id="audit">Проверить размеры, реальные аудиокадры и переходы</button><span class="status" id="state">Ещё не проверено</span><pre id="report">При загрузке оба iframe полностью интерактивны. Нажми «Проверить».</pre></div>
+<div class="panel"><button id="reactiontest">Проверка реакции на звук / тишину при одинаковом t=0.4</button><span class="status" id="reactionstate">Ещё не проверено</span><pre id="reactionreport">Сравнение пикселей аудиореактивной сцены для тишины, баса 70 Гц и звука 4 кГц в одинаковый момент.</pre></div>
+<div class="panel"><button id="exporttest">Тест покадрового экспорта MP4/WebM — 30 fps</button><span class="status" id="exportstate">Ещё не проверено</span><pre id="exportreport">Отдельный тест WebCodecs + реального PCM · 30 кадров/сек. Никаких файлов пользователю не выгружается.</pre><video id="preview-test" preload="metadata" muted playsinline controls style="display:block;max-width:210px;max-height:310px"></video></div>
+<script>
+const state=document.querySelector('#state'),report=document.querySelector('#report');
+const delay=ms=>new Promise(r=>setTimeout(r,ms));
+const out=[];
+const say=(s)=>{out.push(s);report.textContent=out.join('\n');};
+function pcmFile(){
+ const rate=22050,seconds=3,N=rate*seconds,data=new ArrayBuffer(44+N*2),v=new DataView(data);
+ const str=(offset,s)=>{for(let i=0;i<s.length;i++)v.setUint8(offset+i,s.charCodeAt(i))};
+ str(0,'RIFF');v.setUint32(4,36+N*2,true);str(8,'WAVE');str(12,'fmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);
+ v.setUint16(22,1,true);v.setUint32(24,rate,true);v.setUint32(28,rate*2,true);v.setUint16(32,2,true);v.setUint16(34,16,true);
+ str(36,'data');v.setUint32(40,N*2,true);
+ for(let i=0;i<N;i++){const t=i/rate,kick=Math.exp(-((t%0.5)*21)),s=Math.sin(2*Math.PI*88*t)*kick*.75+Math.sin(2*Math.PI*440*t)*Math.exp(-t*.25)*.08;
+ v.setInt16(44+i*2,Math.max(-32767,Math.min(32767,Math.floor(s*32767))),true);}
+ return new File([data],'qa-synthetic.wav',{type:'audio/wav'});
+}
+function pixHash(canvas){
+ const ctx=canvas.getContext('2d'),w=canvas.width,h=canvas.height,vals=ctx.getImageData(0,0,w,h).data;
+ let hash=2166136261;for(let i=0;i<vals.length;i+=47){hash^=vals[i];hash=Math.imul(hash,16777619)}
+ return (hash>>>0).toString(16);
+}
+async function auditFrame(frame) {
+ const w=frame.width,h=frame.height,win=frame.contentWindow,doc=win.document,name=frame.id;
+ let tries=0;while(!doc.getElementById('visual')&&tries++<40)await delay(200);
+ if(!doc.getElementById('visual')){say(name+': ❌ no canvas, module load failed');return;}
+ const width=doc.documentElement.scrollWidth,style=win.getComputedStyle(doc.querySelector('main')),main=doc.querySelector('main'),aspect=doc.querySelector('canvas').width/doc.querySelector('canvas').height;
+ const violations=[...doc.querySelectorAll('button,input,select,a')].filter(e=>{const r=e.getBoundingClientRect(),cs=win.getComputedStyle(e);return cs.display!=='none'&&r.width>0&&(r.x<-1||r.right>w+1);}).slice(0,9).map(e=>e.tagName+'#'+e.id+' '+Math.round(e.getBoundingClientRect().right));
+ say(name+': viewport='+w+'×'+h+', scrollWidth='+width+', main display='+style.display+', canvas aspect='+aspect.toFixed(3)+', overflow controls='+JSON.stringify(violations));
+ const canvas=doc.getElementById('visual');
+ const wav=pcmFile(),input=doc.querySelector('#audioFile'),dt=new win.DataTransfer();dt.items.add(wav);input.files=dt.files;
+ input.dispatchEvent(new win.Event('change',{bubbles:true}));
+ let ok=false;for(let i=0;i<70;i++){await delay(100);if(doc.querySelector('#audioName').textContent==='qa-synthetic.wav'){ok=true;break;}}
+ say(name+': audio import '+(ok?'OK':'TIMEOUT')+'; source='+doc.querySelector('#sourceStatus').textContent);
+ if(!ok)return;
+ for(const title of ['CAUSTIC','DISPLACED','THERMAL']) {
+  const button=[...doc.querySelectorAll('#looks .look')].find(e=>e.textContent.includes(title));
+  if(!button){say(name+': ❌ Missing '+title);continue;}button.click();await delay(1000);
+  const seek=doc.querySelector('#seek');
+  seek.value='.4';seek.dispatchEvent(new win.Event('input',{bubbles:true}));await delay(750);const a=pixHash(canvas);
+  seek.value='1.3';seek.dispatchEvent(new win.Event('input',{bubbles:true}));await delay(750);const b=pixHash(canvas);
+  say(name+': '+title+' frame hashes '+a+' / '+b+'; motion='+ (a!==b?'CHANGED':'STATIC')+'; tracker='+JSON.stringify(win.__BLEACH_FRAME_DEBUG__?.trackerCount??null)+'; visibleHUD='+JSON.stringify(win.__BLEACH_FRAME_DEBUG__?.visibleHUD??null)+'; raster='+JSON.stringify(win.__BLEACH_FRAME_DEBUG__?.nativeRaster??null));
+ }
+ doc.querySelector('#aspect').value='landscape';doc.querySelector('#aspect').dispatchEvent(new win.Event('input',{bubbles:true}));
+ await delay(200);
+ let rect=canvas.getBoundingClientRect();say(name+': 16:9 canvas ratio='+Math.round(rect.width/rect.height*100)/100+' expected 1.78');
+}
+document.getElementById('audit').onclick=async()=>{
+ document.getElementById('audit').disabled=true;state.textContent='Проверка...';out.length=0;
+ try{for(const id of ['phone390','phone320'])await auditFrame(document.getElementById(id));state.textContent='Завершено';}
+ catch(e){say('ERROR: '+(e?.stack||e));state.textContent='Ошибка QA';}
+ finally{document.getElementById('audit').disabled=false;}
+};
+
+document.getElementById('exporttest').onclick=async()=>{
+ const button=document.getElementById('exporttest'),status=document.getElementById('exportstate'),report=document.getElementById('exportreport');
+ button.disabled=true;status.textContent='Экспорт...';
+ const stamp=performance.now();
+ try{
+  const {exportFrameAccurate}=await import('./frame-export.js');
+  const ac=new AudioContext({sampleRate:48000}),buf=ac.createBuffer(2,48000,48000);
+  for(let ch=0;ch<2;ch++){let samples=buf.getChannelData(ch);for(let i=0;i<samples.length;i++){let t=i/48000;samples[i]=Math.sin(t*440*2*Math.PI)*.2*Math.exp(-2*t);}}
+  const result=await exportFrameAccurate({
+   audioBuffer:buf,canvasWidth:320,canvasHeight:568,fps:30,start:0,duration:1,loopAudio:false,volume:.8,
+   renderAt:(ctx,t)=>{ctx.fillStyle='#121524';ctx.fillRect(0,0,320,568);ctx.fillStyle='#b99dfa';ctx.fillRect(40+Math.round(180*t),180,38,38);ctx.font='24px sans-serif';ctx.fillStyle='#fff';ctx.fillText(t.toFixed(3)+' s',42,320);},
+   progress:()=>{},cancelled:()=>false
+  });
+  await ac.close();
+  report.textContent='export OK | format='+result.ext+' frames='+result.frames+' size='+result.blob.size+' bytes | encode ms='+Math.round(performance.now()-stamp);
+  const video=document.getElementById('preview-test');
+  video.src=URL.createObjectURL(result.blob);
+  await new Promise((resolve,reject)=>{video.onloadedmetadata=resolve;video.onerror=()=>reject(Error('exported video unreadable in browser'));setTimeout(()=>reject(Error('video metadata timeout')),20000);});
+  report.textContent+=' | duration='+video.duration.toFixed(3)+'s | videoWidth='+video.videoWidth+' | videoHeight='+video.videoHeight;
+  status.textContent=(Math.abs(video.duration-1)<0.15&&result.frames===30)?'PASS':'CHECK';
+ }catch(e){status.textContent='FAIL';report.textContent=String(e?.stack||e)}
+ finally{button.disabled=false}
+};
+
+document.getElementById('reactiontest').onclick=async()=>{
+ const button=document.getElementById('reactiontest'),status=document.getElementById('reactionstate'),report=document.getElementById('reactionreport');
+ button.disabled=true;status.textContent='Проверка...';
+ try{
+  const m=await import('./bleach-scene.js'),ac=new AudioContext({sampleRate:48000});
+  const make=(f)=>{const b=ac.createBuffer(1,48000*3,48000);if(f){const pcm=b.getChannelData(0);for(let i=0;i<pcm.length;i++)pcm[i]=Math.sin(Math.PI*2*f*i/48000)*.72;}return b;};
+  const audio=[['silence',make(0)],['bass70Hz',make(70)],['high4000Hz',make(4000)]],pairs=[];
+  for(const mode of ['bleach','displaced','thermal']){
+   const hashes=[];
+   for(const [name,b] of audio){
+    const cv=document.createElement('canvas');cv.width=320;cv.height=568;
+    m.setBleachAudioSource(b);
+    m.renderBleach(cv.getContext('2d',{alpha:false}),cv.width,cv.height,0.4,{mode,react:1},{audioLoop:false},false);
+    hashes.push(name+'='+pixHash(cv));
+   }
+   pairs.push(mode+': '+hashes.join(' vs '));
+  }
+  report.textContent=pairs.join('\n');
+  status.textContent=pairs.every(x=>new Set(x.split(' vs ').map(v=>v.split('=')[1])).size>1)?'PASS — отличается от тишины':'CHECK — некоторая сцена не реагирует';
+  await ac.close();
+ }catch(e){status.textContent='FAIL';report.textContent=String(e?.stack||e)}
+ finally{button.disabled=false}
+};
+</script></body></html>
