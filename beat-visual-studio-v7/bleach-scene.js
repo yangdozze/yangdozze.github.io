@@ -32,8 +32,8 @@ export function setBleachAudioSource(decoded) {
 function rasterFor(canvas,w,h,thumb,exportMode=false){
   let v=registry.get(canvas);
   const maxWidth=thumb?108:exportMode?(w>=1000?440:340):(typeof window!=='undefined'&&window.innerWidth<700?176:232);
-  // METHOD's raster engine has quadratic CPU cost. Keep the film 9:16 without
-  // changing the engine's original displacement, tracking and audio math.
+  // The local CPU raster engine has quadratic CPU cost. Keep the film 9:16 without
+  // changing its displacement, tracking and audio math.
   const aspect=w/h;
   const rw=Math.round(Math.min(maxWidth,Math.max(100,Math.min(w,h*aspect))));
   const rh=Math.max(1,Math.round(rw/aspect));
@@ -68,7 +68,7 @@ export function renderBleach(ctx,w,h,t,settings={},data={},thumb=false){
   CAUSTIC.applyUser();
   const duration=audio.duration;
   const frameTime=data.audioLoop?((t%duration)+duration)%duration:clamp(t,0,Math.max(0,duration-.001));
-  // The original CPU raster is not intended to run 60 times a second in a
+  // This CPU raster is not intended to run 60 times a second in a
   // mobile Chromium/Safari UI loop. Draw cached canvas between real updates.
   // Scrubbing backwards or to another part of the beat always forces a frame.
   const minStep=settings.exportMode?0:thumb?.25:(typeof window!=='undefined'&&window.innerWidth<700?1/24:1/30);
@@ -85,7 +85,7 @@ export function renderBleach(ctx,w,h,t,settings={},data={},thumb=false){
       window.__BLEACH_FRAME_DEBUG__={engine:'Beat Visual Studio Caustic reference reconstruction',time:frameTime,sourceVersion,hasAudio:true,trackerCount:obj.renderer.trk?.tracks?.length||0,size:[obj.rw,obj.rh]};
     }
   }catch(error){
-    console.error('METHOD Caustic renderer failed',error);
+    console.error('Caustic reference renderer failed',error);
     ctx.fillStyle='#f4eeee';ctx.textAlign='center';ctx.font=`${Math.max(15,w*.029)}px sans-serif`;
     ctx.fillText('Ошибка рендера Caustic',w/2,h/2);
   }
