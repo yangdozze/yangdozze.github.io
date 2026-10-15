@@ -1,8 +1,8 @@
 /**
- * BLEACH / Caustic source integration.
- * The original METHOD engine is used with the author's permission as stated by
- * the project owner. Its core is in ./caustic-core.js (METHOD attribution).
- * This adapter only manages decoded PCM, resizing, and the existing editor API.
+ * Caustic / Displaced / Thermal variants based on the project's METHOD visual reference.
+ * The local CAUSTIC engine is a reference-based reconstruction, not a verified copy
+ * of METHOD's original implementation. Visual attribution is preserved below.
+ * This adapter manages decoded PCM, sizing, and timing.
  */
 import {CAUSTIC} from './caustic-core.js';
 
@@ -29,9 +29,9 @@ export function setBleachAudioSource(decoded) {
   sourceVersion++;
 }
 
-function rasterFor(canvas,w,h,thumb){
+function rasterFor(canvas,w,h,thumb,exportMode=false){
   let v=registry.get(canvas);
-  const maxWidth=thumb?118:(typeof window!=='undefined'&&window.innerWidth<700?216:288);
+  const maxWidth=thumb?108:exportMode?(w>=1000?440:340):(typeof window!=='undefined'&&window.innerWidth<700?176:232);
   // METHOD's raster engine has quadratic CPU cost. Keep the film 9:16 without
   // changing the engine's original displacement, tracking and audio math.
   const aspect=w/h;
@@ -57,11 +57,13 @@ export function renderBleach(ctx,w,h,t,settings={},data={},thumb=false){
     }
     ctx.restore();return;
   }
-  const obj=rasterFor(ctx.canvas,w,h,thumb);
+  const obj=rasterFor(ctx.canvas,w,h,thumb,!!settings.exportMode);
   if(obj.sourceVersion!==sourceVersion){obj.renderer.clear();obj.sourceVersion=sourceVersion;obj.last=-1;}
-  // DEFAULTS ARE THE ORIGINAL METHOD CAUSTIC CONTROLS, not our old sinusoid approximation.
-  CAUSTIC.U.stage=settings.bleachLook==='thermal'?'out':'disp';
-  CAUSTIC.U.tracker=.65;
+  // Visual variants share one audio analyser and shape renderer. No fake tracker coordinates.
+  const variant=settings.mode||'bleach';
+  CAUSTIC.U.stage=variant==='displaced'?'disp':'out';
+  CAUSTIC.U.tracker=variant==='thermal'?0:variant==='displaced'?.38:.62;
+  CAUSTIC.U.displacement=variant==='thermal'?.55:variant==='displaced'?1.3:1;
   CAUSTIC.U.low=CAUSTIC.U.mid=CAUSTIC.U.high=clamp(Number(settings.react)||1,.15,2);
   CAUSTIC.applyUser();
   const duration=audio.duration;
@@ -69,7 +71,7 @@ export function renderBleach(ctx,w,h,t,settings={},data={},thumb=false){
   // The original CPU raster is not intended to run 60 times a second in a
   // mobile Chromium/Safari UI loop. Draw cached canvas between real updates.
   // Scrubbing backwards or to another part of the beat always forces a frame.
-  const minStep=thumb?0.22:(typeof window!=='undefined'&&window.innerWidth<700?1/12:1/18);
+  const minStep=settings.exportMode?0:thumb?.25:(typeof window!=='undefined'&&window.innerWidth<700?1/24:1/30);
   if(obj.last>=0 && frameTime>=obj.last && frameTime-obj.last<minStep){
     ctx.drawImage(obj.layer,0,0,w,h);
     ctx.restore();return;
@@ -80,7 +82,7 @@ export function renderBleach(ctx,w,h,t,settings={},data={},thumb=false){
     obj.renderer.render(obj.ctx,obj.rw,obj.rh,frameTime,audio.pcm,audio.sr,dt);
     ctx.drawImage(obj.layer,0,0,w,h);
     if(!thumb&&typeof window!=='undefined'){
-      window.__BLEACH_FRAME_DEBUG__={engine:'METHOD Caustic original',time:frameTime,sourceVersion,hasAudio:true,trackerCount:obj.renderer.trk?.tracks?.length||0,size:[obj.rw,obj.rh]};
+      window.__BLEACH_FRAME_DEBUG__={engine:'Beat Visual Studio Caustic reference reconstruction',time:frameTime,sourceVersion,hasAudio:true,trackerCount:obj.renderer.trk?.tracks?.length||0,size:[obj.rw,obj.rh]};
     }
   }catch(error){
     console.error('METHOD Caustic renderer failed',error);
