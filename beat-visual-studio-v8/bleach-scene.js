@@ -81,16 +81,6 @@ export function renderBleach(ctx,w,h,t,settings={},data={},thumb=false){
     ];
     const configKey=cfg.join('/');
     if(v.look!==look || v.config!==configKey){
-      v.engine.setLook(look);
-      // Original METHOD adapter and original engine parameters; no alternate field mathematics.
-      CausticAdapter.params.slice(0,3).forEach((p,i)=>{
-        if(thumb){
-          CAUSTIC.U[p.k]=cfg[i];CAUSTIC.applyUser();
-        }else v.engine.set(p.k,cfg[i]);
-      });
-      CAUSTIC.TK.cap=cfg[3];
-      CAUSTIC.U.low=CAUSTIC.U.mid=CAUSTIC.U.high=cfg[4];
-      CAUSTIC.applyUser();
       v.look=look;v.config=configKey;v.lastTime=-1;
     }
     if(v.sourceVersion!==sourceVersion){
@@ -104,6 +94,22 @@ export function renderBleach(ctx,w,h,t,settings={},data={},thumb=false){
       ctx.drawImage(v.engine.canvas,0,0,w,h);
       ctx.restore();return;
     }
+    // CAUSTIC.U and the original adapter are singleton-scope parameters.
+    // The UI thumbnails change the same scope, so restore the exact current look
+    // and its controls before EVERY frame (otherwise DISPLACED becomes THERMAL).
+    v.engine.setLook(look);
+    if(thumb){
+      CAUSTIC.U.displacement=cfg[0];
+      CAUSTIC.U.speed=cfg[1];
+      CAUSTIC.U.tracker=cfg[2];
+    }else{
+      v.engine.set('displacement',cfg[0]);
+      v.engine.set('speed',cfg[1]);
+      v.engine.set('tracker',cfg[2]);
+    }
+    CAUSTIC.TK.cap=cfg[3];
+    CAUSTIC.U.low=CAUSTIC.U.mid=CAUSTIC.U.high=cfg[4];
+    CAUSTIC.applyUser();
     const dt=v.lastTime>=0?clamp(at-v.lastTime,1/240,.1):1/30;
     v.engine.frame(at,dt);
     v.lastTime=at;
