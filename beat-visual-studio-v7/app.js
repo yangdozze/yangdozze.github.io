@@ -3,8 +3,9 @@ import {MODES,render,safeRegion} from './render.js?v=method2';
 import {audioEnvelope,audioFrame} from './audio-frame.js?v=method2';
 import {analysePCM,featureAt} from './audio-features.js?v=method2';
 import {setBleachAudioSource} from './bleach-scene.js';
+import {exportFrameAccurate} from './frame-export.js';
 const $=id=>document.getElementById(id),canvas=$('visual'),ctx=canvas.getContext('2d',{alpha:false});let midi=null,buffer=null,cover=null,demo=false,ac,analyser,master,destination,splitter,left,right,source,voices=[],playing=false,started=0,position=0,recording=false,recorder,cancelled=false,recordStream,raf,downloadURL,wakeLock;
-let previousBpm=120;let playbackEpoch=0,pausedFrameCache=null,noteCache={},envelopeCache={buffer:null,peaks:null},featureCache={buffer:null,profile:null};let lastBleachSource=null;let importQueue=Promise.resolve();function enqueueImport(fn,file){importQueue=importQueue.catch(()=>{}).then(()=>fn(file));return importQueue;}document.body.classList.add('light');
+let offlineRendering=false;let previousBpm=120;let playbackEpoch=0,pausedFrameCache=null,noteCache={},envelopeCache={buffer:null,peaks:null},featureCache={buffer:null,profile:null};let lastBleachSource=null;let importQueue=Promise.resolve();function enqueueImport(fn,file){importQueue=importQueue.catch(()=>{}).then(()=>fn(file));return importQueue;}document.body.classList.add('light');
 const ids=['bpm','key','titleText','artist','accent','background','ink','scale','noteFocus','safeProfile','showSafe','react','offset','midiLoop','loopMidi','labels','synth','loopAudio','volume','aspect','resolution','fps','start','duration','track'];
 let freq=new Uint8Array(1024),wave=new Float32Array(2048),waveR=new Float32Array(2048),energy=0;
 const defaults={bpm:120,key:'—',titleText:'',artist:'yangdozze',accent:'#9571d8',background:'#faf9f4',ink:'#242126',scale:1,noteFocus:15,safeProfile:'creator',showSafe:false,react:1,offset:0,midiLoop:16,loopMidi:true,labels:true,synth:false,loopAudio:true,volume:.8,aspect:'portrait',resolution:'720',fps:'30',start:0,duration:16,track:'all',mode:'strip'};let mode='strip';
@@ -52,7 +53,7 @@ function currentFrameData(t=now()){
 }
 function draw(){let t=now();if(playing&&t>=duration()){if(recording)finishRecording();else{pause();position=duration();}t=Math.min(position,duration());}
  let frame=currentFrameData(t);if(!midi&&!buffer){ctx.fillStyle=mode==='night'?'#111018':'#faf9f4';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.fillStyle=mode==='night'?'#bea9d8':'#5b5360';ctx.textAlign='center';ctx.font=`600 ${Math.round(canvas.width*.033)}px Arial,sans-serif`;ctx.fillText('ЗАГРУЗИ MIDI / АУДИО',canvas.width/2,canvas.height/2);ctx.font=`${Math.round(canvas.width*.020)}px Arial,sans-serif`;ctx.fillText('STRIP  /  NIGHT  /  CAUSTIC',canvas.width/2,canvas.height/2+canvas.height*.042)}else render(ctx,canvas.width,canvas.height,t,settings(),frame);$('seek').value=t;$('clock').textContent=timeStr(t)+' / '+timeStr(duration());$('fullSeek').max=duration();$('fullSeek').value=t;$('fullClock').textContent=timeStr(t)+' / '+timeStr(duration());$('fullPlay').textContent=playing?'Ⅱ':'▶';
- if(recording)$('progress').value=(t-(+$('start').value))/(+$('duration').value);raf=requestAnimationFrame(draw);
+ if(recording&&!offlineRendering)$('progress').value=(t-(+$('start').value))/(+$('duration').value);raf=requestAnimationFrame(draw);
 }
 function resetTransport(){pause();position=0;}
 async function importAudio(file){if(!file)return;if(recording)throw Error('Сначала заверши экспорт');if(file.size>160*1024*1024)throw Error('Аудиофайл больше 160 МБ. Используй короткий WAV или MP3');resetTransport();await audioInit();let result;try{result=await ac.decodeAudioData(await file.arrayBuffer());}catch{throw Error('Не удалось прочитать аудио. Попробуй WAV PCM, MP3 или M4A');}buffer=result;featureCache={buffer:null,profile:null};demo=false;$('synth').checked=false;$('audioName').textContent=file.name;$('demoTag').hidden=true;let info=filenameInfo(file.name);if(info.bpm)$('bpm').value=info.bpm;$('key').value=info.key?info.key:'—';$('titleText').value=file.name.replace(/\.[^.]+$/,'').slice(0,60);$('duration').value=Math.min(180,buffer.duration).toFixed(2);$('sourceStatus').textContent=midi?`MIDI: ${midi.notes.length} нот · аудио: ${buffer.duration.toFixed(2)} сек. · ${buffer.numberOfChannels>1?'стерео':'моно'}`:`Аудио: ${buffer.duration.toFixed(2)} сек. · ${buffer.numberOfChannels>1?'стерео':'моно'}`;if($('midiName').textContent==='Добавить MIDI'){midi=null;$('midiLoop').value=0;mode='night';}updateTracks();updateUI();renderLooks();persist();toast('Аудио загружено');}
@@ -85,21 +86,62 @@ $('fullscreen').onclick=protect(async()=>{if(document.fullscreenElement){await d
 document.addEventListener('fullscreenchange',()=>{let active=!!document.fullscreenElement||stageEl.classList.contains('immersive');$('exitFullscreen').hidden=!active;$('fullControls').hidden=!active;});$('fullPlay').onclick=()=>$('play').click();$('fullSeek').oninput=()=>{$('seek').value=$('fullSeek').value;$('seek').oninput();};
 
 window.addEventListener('keydown',e=>{if(['INPUT','SELECT','TEXTAREA','BUTTON'].includes(e.target.tagName)||$('helpDialog').open)return;if(e.code==='Space'){e.preventDefault();$('play').click();}});
+async function deterministicExport(dur,start){
+  const wasPosition=position;
+  await audioInit();
+  pause();position=start;
+  resize();recording=true;offlineRendering=true;cancelled=false;
+  $('download').hidden=true;lockControls(true);
+  $('cancel').hidden=false;$('progress').hidden=false;$('progress').value=0;
+  $('exportHint').textContent='Покадровый экспорт: обработка каждого кадра и звука с точными временными метками.';
+  try{
+    const result=await exportFrameAccurate({
+      audioBuffer:buffer,canvasWidth:canvas.width,canvasHeight:canvas.height,
+      fps:Number($('fps').value),start,duration:dur,
+      loopAudio:$('loopAudio').checked,volume:Number($('volume').value),
+      renderAt:(offCtx,time)=>{
+        render(offCtx,canvas.width,canvas.height,time,{...settings(),exportMode:true},currentFrameData(time));
+      },
+      progress:f=>{$('progress').value=f;},
+      cancelled:()=>cancelled
+    });
+    if(downloadURL)URL.revokeObjectURL(downloadURL);
+    downloadURL=URL.createObjectURL(result.blob);
+    const filename=($('titleText').value||'beat-visual')
+      .replace(/[^\\p{L}\\p{N}_-]+/gu,'_')+'.'+result.ext;
+    const link=document.createElement('a');
+    link.href=downloadURL;link.download=filename;
+    link.textContent=`Скачать ${result.ext.toUpperCase()} · ${result.frames} кадров · ${(result.blob.size/1048576).toFixed(1)} МБ`;
+    $('download').replaceChildren(link);$('download').hidden=false;link.click();
+    toast('Видео готово: '+result.frames+' кадров с точными временными метками.');
+    return true;
+  }catch(error){
+    if(error?.name==='AbortError'||cancelled){toast('Покадровый экспорт отменён.');return true;}
+    console.warn('Offline export not supported, falling back to realtime capture:',error);
+    toast('Покадровый MP4 недоступен: '+(error?.message||'ошибка')+'. Включаю обычную запись.');
+    return false;
+  }finally{
+    recording=false;offlineRendering=false;position=wasPosition;
+    lockControls(false);$('cancel').hidden=true;$('progress').hidden=true;
+    $('exportHint').textContent='Покадровый MP4/WebM для современных браузеров; при отсутствии WebCodecs — запись в реальном времени.';
+  }
+}
 function exportMime(){if(!window.MediaRecorder||!canvas.captureStream)return null;
  // Bare video/mp4 can contain VP9/Opus in Chromium, which is not an H.264/AAC MP4.
  // Require explicit codecs for MP4; otherwise label the actual fallback WebM.
  return ['video/mp4;codecs="avc1.42E01E,mp4a.40.2"','video/mp4;codecs=avc1.42E01E,mp4a.40.2','video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'].find(m=>MediaRecorder.isTypeSupported(m))||null;
 }
-const mime=exportMime();$('exportHint').textContent=mime?`Экспорт ${mime.includes('mp4')?'MP4':'WebM'} со звуком · в реальном времени. Держи вкладку открытой.`:'Запись видео недоступна в этом браузере. Можно сохранить PNG кадр.';if(!mime)$('export').disabled=true;
+const mime=exportMime();$('exportHint').textContent=window.VideoEncoder&&window.AudioEncoder?'Покадровый MP4/WebM со звуком · точное число кадров, без зависимости от скорости просмотра.':mime?'Запись видео в реальном времени (WebCodecs недоступен). Не сворачивай вкладку.':'Этот браузер не поддерживает экспорт видео.';if(!mime&&!(window.VideoEncoder&&window.AudioEncoder))$('export').disabled=true;
 function lockControls(locked){document.querySelectorAll('aside input,aside select,aside button,.transport button,.transport input,#snapshot').forEach(el=>el.disabled=locked);$('cancel').disabled=false;document.querySelectorAll('label.button').forEach(el=>el.style.pointerEvents=locked?'none':'');}
 function finishRecording(){if(!recording)return;pause();if(recorder?.state==='recording')recorder.stop();}
 async function cleanupRecording(){recording=false;stopNodes();recordStream?.getVideoTracks().forEach(t=>t.stop());recordStream=null;if(wakeLock){try{await wakeLock.release();}catch{}wakeLock=null;}lockControls(false);$('cancel').hidden=true;$('progress').hidden=true;}
 $('export').onclick=protect(async()=>{
  if(recording)return;if(!MODES.length)throw Error('Сначала создадим первый стиль; после этого включится экспорт.');let dur=+$('duration').value,start=+$('start').value;if(!(dur>=1&&dur<=180&&start>=0&&start<=3600))throw Error('Длина должна быть от 1 до 180 сек., начало — от 0 до 3600');if(!buffer&&!$('synth').checked)throw Error('Добавь аудио или включи озвучку MIDI');if(!buffer&&!midi)throw Error('Сначала добавь аудио или MIDI');
+ if(buffer&&window.VideoEncoder&&window.AudioEncoder){if(await deterministicExport(dur,start))return;}
  await audioInit();pause();resize();position=start;render(ctx,canvas.width,canvas.height,position,settings(),currentFrameData(position));let chosen=exportMime();if(!chosen)throw Error('Запись видео не поддерживается');let video=canvas.captureStream(+$('fps').value);recordStream=new MediaStream([...video.getVideoTracks(),...destination.stream.getAudioTracks()]);let chunks=[];
  try{recorder=new MediaRecorder(recordStream,{mimeType:chosen,videoBitsPerSecond:$('resolution').value==='1080'?9000000:4500000,audioBitsPerSecond:192000});}catch(e){recordStream.getVideoTracks().forEach(t=>t.stop());throw Error('Браузер не смог начать запись. Попробуй 720p / 30 FPS');}
  cancelled=false;recording=true;lockControls(true);$('cancel').hidden=false;$('progress').hidden=false;$('progress').value=0;$('download').hidden=true;
  recorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data);};recorder.onerror=async()=>{cancelled=true;pause();await cleanupRecording();toast('Ошибка записи. Попробуй 720p / 30 FPS');};recorder.onstop=async()=>{let actual=recorder.mimeType||chosen;await cleanupRecording();if(cancelled){toast('Экспорт отменён');return;}if(!chunks.length){toast('Браузер не вернул видео. Попробуй другой браузер');return;}let blob=new Blob(chunks,{type:actual});if(downloadURL)URL.revokeObjectURL(downloadURL);downloadURL=URL.createObjectURL(blob);let ext=actual.includes('mp4')?'mp4':'webm',filename=($('titleText').value||'beat-visual').replace(/[^\p{L}\p{N}_-]+/gu,'_')+'.'+ext;$('download').replaceChildren();let a=document.createElement('a');a.href=downloadURL;a.download=filename;a.textContent=`Скачать ${ext.toUpperCase()} · ${(blob.size/1024/1024).toFixed(1)} МБ`;$('download').append(a);$('download').hidden=false;a.click();toast('Видео готово. Ссылка на скачивание — под кнопкой экспорта.');};
  try{if(navigator.wakeLock)try{wakeLock=await navigator.wakeLock.request('screen');}catch{}recorder.start(200);await startPlayback(start);toast('Идёт запись. Не сворачивай вкладку.');}catch(e){cancelled=true;if(recorder.state==='recording')recorder.stop();else await cleanupRecording();throw e;}
-});$('cancel').onclick=()=>{cancelled=true;finishRecording();};document.addEventListener('visibilitychange',()=>{if(document.hidden&&recording){cancelled=true;finishRecording();toast('Запись отменена: вкладка была скрыта. Повтори, оставив её открытой.');}});
+});$('cancel').onclick=()=>{cancelled=true;if(!offlineRendering)finishRecording();};document.addEventListener('visibilitychange',()=>{if(document.hidden&&recording){cancelled=true;if(!offlineRendering)finishRecording();toast('Запись отменена: вкладка была скрыта. Повтори, оставив её открытой.');}});
 window.addEventListener('beforeunload',()=>{stopNodes();if(downloadURL)URL.revokeObjectURL(downloadURL);});updateTracks();resize();updateUI();renderLooks();if(window.ResizeObserver)new ResizeObserver(fitStage).observe(document.querySelector('.stage-wrap'));else window.addEventListener('resize',fitStage);draw();
