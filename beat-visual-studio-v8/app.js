@@ -1,8 +1,8 @@
 import {parseMidi,demoMidi,testMidi,filenameInfo,mod} from './midi.js?v=method2';
-import {MODES,render,safeRegion} from './render.js?v=method2';
+import {MODES,render,safeRegion} from './render.js?v=m20261016c';
 import {audioEnvelope,audioFrame} from './audio-frame.js?v=method2';
 import {analysePCM,featureAt} from './audio-features.js?v=method2';
-import {setBleachAudioSource} from './bleach-scene.js';
+import {setBleachAudioSource} from './bleach-scene.js?v=m20261016c';
 import {exportFrameAccurate} from './frame-export.js';
 const $=id=>document.getElementById(id),canvas=$('visual'),ctx=canvas.getContext('2d',{alpha:false});let midi=null,buffer=null,cover=null,demo=false,ac,analyser,master,destination,splitter,left,right,source,voices=[],playing=false,started=0,position=0,recording=false,recorder,cancelled=false,recordStream,raf,downloadURL,wakeLock;
 let offlineRendering=false;let previousBpm=120;let playbackEpoch=0,pausedFrameCache=null,noteCache={},envelopeCache={buffer:null,peaks:null},featureCache={buffer:null,profile:null};let lastBleachSource=null;let importQueue=Promise.resolve();function enqueueImport(fn,file){importQueue=importQueue.catch(()=>{}).then(()=>fn(file));return importQueue;}document.body.classList.add('light');
