@@ -7,9 +7,9 @@
  * This file handles host audio, mode selection and video canvas scaling.
  * No independently simulated waveforms or fake HUD tracks.
  */
-import {CausticAdapter} from './method-caustic-adapter.js?v=m20261016c';
-import {CAUSTIC} from './caustic-core.js?v=m20261016c';
-import {drawMethodTrackerHUD} from './method-tracker-hud.js?v=m20261016c';
+import {CausticAdapter} from './method-caustic-adapter.js?v=m20261016d';
+import {CAUSTIC} from './caustic-core.js?v=m20261016d';
+import {drawMethodTrackerHUD} from './method-tracker-hud.js?v=m20261016d';
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 const renderers=new WeakMap();
 let audio=null,sourceVersion=0;
@@ -62,6 +62,9 @@ export function renderBleach(ctx,w,h,t,settings={},data={},thumb=false){
   ctx.save();
   ctx.fillStyle=look==='out'?'#ff7e02':'#000';
   ctx.fillRect(0,0,w,h);
+  // Also receive the decoded source through render data, so playback and export cannot
+  // silently use different audio state if a browser cached an older ES module URL.
+  if(data.decodedAudio&&audio?.buffer!==data.decodedAudio)setBleachAudioSource(data.decodedAudio);
   if(!audio){
     if(!thumb){
       ctx.fillStyle=look==='out'?'#17100a':'#e7e7e4';
