@@ -1,6 +1,12 @@
 import {renderStrip,renderNight} from './akira-scenes.js';
 import {renderBleach} from './bleach-scene.js';
-export const MODES=[{id:'strip',name:'Светлый STRIP',type:'midi+audio'},{id:'night',name:'Тёмный NIGHT',type:'midi+audio'},{id:'bleach',name:'BLEACH / METHOD',type:'audio'}];
+export const MODES=[
+{id:'strip',name:'STRIP',type:'midi+audio'},
+{id:'night',name:'NIGHT',type:'midi+audio'},
+{id:'bleach',name:'CAUSTIC',type:'audio'},
+{id:'displaced',name:'DISPLACED',type:'audio'},
+{id:'thermal',name:'THERMAL',type:'audio'}
+];
 
 export const SAFE_PROFILES={
  creator:{left:.05,right:.12,top:.08,bottom:.20},
@@ -195,7 +201,7 @@ function scrollAudio(ctx,box,t,s,data,accent,ink){
 
 export function render(ctx,w,h,t,s,data={},thumb=false){
  if(s.mode==='pulse')return pulse(ctx,w,h,t,s,data,thumb);
- if(s.mode==='bleach')return renderBleach(ctx,w,h,t,s,data,thumb);
+ if(['bleach','displaced','thermal'].includes(s.mode))return renderBleach(ctx,w,h,t,s,data,thumb);
  if(s.mode==='strip')return renderStrip(ctx,w,h,t,s,data,thumb);
  if(s.mode==='night')return renderNight(ctx,w,h,t,s,data,thumb);
  const bg=s.background||'#080d1b',accent=s.accent||'#8c9aff',ink=s.ink||'#f5f7ff';
