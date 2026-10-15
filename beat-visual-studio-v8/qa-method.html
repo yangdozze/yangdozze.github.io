@@ -53,6 +53,14 @@ document.querySelector('#test').onclick=async()=>{
    await sleep();
   }
  }
+ adapter.setLook('disp');
+ for(const threshold of [.75,.60,.45,.30,.20,.12]){
+  CAUSTIC.TK.thr=threshold;const start=performance.now();
+  adapter.frame(1.5+threshold*.3,1/30);
+  push('tracker threshold '+threshold+': renderMs='+Math.round(performance.now()-start)+' '+JSON.stringify(stats(c)));
+  out.getContext('2d').drawImage(c,0,0,out.width,out.height);
+  await sleep();
+ }
  push('Original METHOD size '+c.width+'x'+c.height+'; control '+JSON.stringify({displace:CAUSTIC.U.displacement,speed:CAUSTIC.U.speed,tracker:CAUSTIC.U.tracker,caption:CAUSTIC.TK.cap}));
  state.textContent='PASS / завершено';
  }catch(e){state.textContent='FAIL';push(String(e?.stack||e));}
