@@ -1,8 +1,8 @@
 import {parseMidi,demoMidi,testMidi,filenameInfo,mod} from './midi.js?v=method2';
-import {MODES,render,safeRegion} from './render.js?v=m20261016c';
+import {MODES,render,safeRegion} from './render.js?v=m20261016d';
 import {audioEnvelope,audioFrame} from './audio-frame.js?v=method2';
 import {analysePCM,featureAt} from './audio-features.js?v=method2';
-import {setBleachAudioSource} from './bleach-scene.js?v=m20261016c';
+import {setBleachAudioSource} from './bleach-scene.js?v=m20261016d';
 import {exportFrameAccurate} from './frame-export.js';
 const $=id=>document.getElementById(id),canvas=$('visual'),ctx=canvas.getContext('2d',{alpha:false});let midi=null,buffer=null,cover=null,demo=false,ac,analyser,master,destination,splitter,left,right,source,voices=[],playing=false,started=0,position=0,recording=false,recorder,cancelled=false,recordStream,raf,downloadURL,wakeLock;
 let offlineRendering=false;let previousBpm=120;let playbackEpoch=0,pausedFrameCache=null,noteCache={},envelopeCache={buffer:null,peaks:null},featureCache={buffer:null,profile:null};let lastBleachSource=null;let importQueue=Promise.resolve();function enqueueImport(fn,file){importQueue=importQueue.catch(()=>{}).then(()=>fn(file));return importQueue;}document.body.classList.add('light');
@@ -56,7 +56,7 @@ function currentFrameData(t=now()){
  else audio={freq:new Uint8Array(1024),wave:new Float32Array(2048),waveR:new Float32Array(2048),energy:0};
  if(buffer&&envelopeCache.buffer!==buffer)envelopeCache={buffer,peaks:audioEnvelope(buffer,768)};
  if(buffer&&featureCache.buffer!==buffer)featureCache={buffer,profile:analysePCM(buffer)};
- return {...audio,audioFeatures:featureAt(featureCache.buffer===buffer?featureCache.profile:null,t,$('loopAudio').checked),notes:filteredNotes(),midiDuration:midi?midi.duration*midi.bpm/(+$('bpm').value||midi.bpm):16,audioPeaks:envelopeCache.buffer===buffer?envelopeCache.peaks:null,audioDuration:buffer?.duration||0,audioChannels:buffer?.numberOfChannels||0,audioSource:demo?'DEMO LOOP':$('audioName').textContent,audioLoop:$('loopAudio').checked,liveWave:playing&&!buffer?wave:null};
+ return {...audio,decodedAudio:buffer,audioFeatures:featureAt(featureCache.buffer===buffer?featureCache.profile:null,t,$('loopAudio').checked),notes:filteredNotes(),midiDuration:midi?midi.duration*midi.bpm/(+$('bpm').value||midi.bpm):16,audioPeaks:envelopeCache.buffer===buffer?envelopeCache.peaks:null,audioDuration:buffer?.duration||0,audioChannels:buffer?.numberOfChannels||0,audioSource:demo?'DEMO LOOP':$('audioName').textContent,audioLoop:$('loopAudio').checked,liveWave:playing&&!buffer?wave:null};
 }
 function draw(){let t=now();if(playing&&t>=duration()){if(recording)finishRecording();else{pause();position=duration();}t=Math.min(position,duration());}
  let frame=currentFrameData(t);if(!midi&&!buffer){ctx.fillStyle=mode==='night'?'#111018':'#faf9f4';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.fillStyle=mode==='night'?'#bea9d8':'#5b5360';ctx.textAlign='center';ctx.font=`600 ${Math.round(canvas.width*.033)}px Arial,sans-serif`;ctx.fillText('ЗАГРУЗИ MIDI / АУДИО',canvas.width/2,canvas.height/2);ctx.font=`${Math.round(canvas.width*.020)}px Arial,sans-serif`;ctx.fillText('STRIP  /  NIGHT  /  CAUSTIC',canvas.width/2,canvas.height/2+canvas.height*.042)}else render(ctx,canvas.width,canvas.height,t,settings(),frame);$('seek').value=t;$('clock').textContent=timeStr(t)+' / '+timeStr(duration());$('fullSeek').max=duration();$('fullSeek').value=t;$('fullClock').textContent=timeStr(t)+' / '+timeStr(duration());$('fullPlay').textContent=playing?'Ⅱ':'▶';
