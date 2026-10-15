@@ -1,0 +1,60 @@
+<!doctype html><html lang="ru"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Beat Visual Studio v8 — live mobile METHOD QA</title><style>
+body{font:14px system-ui;background:#f2f1ef;color:#1a1920;margin:0;padding:18px}
+h1{font-size:20px}section{display:flex;flex-wrap:wrap;gap:16px;align-items:start}
+iframe{display:block;width:390px;height:780px;max-width:100%;border:6px solid #202027;border-radius:18px;background:white}
+button{padding:12px 15px;border:1px solid #bbb;border-radius:8px;background:white;font:inherit;cursor:pointer}
+pre{width:min(100%,420px);white-space:pre-wrap;overflow-wrap:anywhere;background:#fff;padding:14px;border-radius:9px;font:12px/1.6 monospace}
+</style>
+<h1>v8 · Проверка METHOD на мобильном</h1><p>Внутри — настоящий v8 в контейнере 390px шириной. WAV создаётся локально, никакие данные не отправляются.</p>
+<button id="test">Протестировать оригинал Displaced / Thermal</button><strong id="state">Не тестировалось</strong>
+<section><iframe id="phone" title="390px Beat Visual Studio v8" src="./?mobile-qa=1" width="390" height="780"></iframe><pre id="log">Результат будет здесь.</pre></section>
+<script>
+const iframe=document.getElementById('phone'),log=document.getElementById('log'),state=document.getElementById('state');
+const wait=ms=>new Promise(r=>setTimeout(r,ms)),lines=[],say=s=>{lines.push(s);log.textContent=lines.join('\n')};
+function makeAudio(){
+ const rate=44100,N=rate*3,b=new ArrayBuffer(44+N*2),dv=new DataView(b);
+ const wr=(off,str)=>{for(let i=0;i<str.length;i++)dv.setUint8(off+i,str.charCodeAt(i))};
+ wr(0,'RIFF');dv.setUint32(4,36+N*2,true);wr(8,'WAVE');wr(12,'fmt ');dv.setUint32(16,16,true);
+ dv.setUint16(20,1,true);dv.setUint16(22,1,true);dv.setUint32(24,rate,true);dv.setUint32(28,rate*2,true);dv.setUint16(32,2,true);dv.setUint16(34,16,true);
+ wr(36,'data');dv.setUint32(40,N*2,true);
+ for(let i=0;i<N;i++){const t=i/rate,k=t%.5;let p=Math.tanh((Math.sin(2*Math.PI*(55+60*Math.exp(-k*60))*k)*Math.exp(-k*19)*1.25+Math.sin(i*1.3)*Math.exp(-(t%.25)*80)*.22+Math.sin(2*Math.PI*110*t)*.15)*2);dv.setInt16(44+i*2,Math.floor(Math.max(-.99,Math.min(.99,p))*32767),true)}
+ return new File([b],'method-v8-test.wav',{type:'audio/wav'});
+}
+function pixels(cv){
+ const p=cv.getContext('2d').getImageData(0,0,cv.width,cv.height).data;
+ let col=0,bright=0;for(let i=0;i<p.length;i+=4){const r=p[i],g=p[i+1],b=p[i+2],m=Math.max(r,g,b);
+ if(m>80)bright++;if(m>40&&(Math.abs(r-g)>16||Math.abs(g-b)>16))col++;}
+ return {brightPixels:bright,colourPixels:col};
+}
+document.getElementById('test').onclick=async()=>{
+ document.getElementById('test').disabled=true;lines.length=0;state.textContent='Тестирование…';
+ try{
+ const doc=iframe.contentWindow.document,win=iframe.contentWindow;
+ for(let t=0;t<80&&!doc.getElementById('audioFile');t++)await wait(200);
+ if(!doc.getElementById('audioFile'))throw Error('v8 modules not loaded');
+ const file=makeAudio(),input=doc.getElementById('audioFile'),dt=new win.DataTransfer();dt.items.add(file);input.files=dt.files;
+ input.dispatchEvent(new win.Event('change',{bubbles:true}));
+ let done=false;
+ for(let t=0;t<80;t++){await wait(140);if(doc.getElementById('audioName').textContent==='method-v8-test.wav'){done=true;break}}
+ if(!done)throw Error('WAV import timeout');
+ say('WAV imported: '+doc.getElementById('sourceStatus').textContent);
+ for(const name of ['DISPLACED','THERMAL','CAUSTIC']){
+  const btn=[...doc.querySelectorAll('.look')].find(b=>b.textContent.includes(name));
+  if(!btn)throw Error('style '+name+' missing');
+  btn.click();
+  for(const t of [.2,.55]){
+   const seek=doc.getElementById('seek');seek.value=t;
+   seek.dispatchEvent(new win.Event('input',{bubbles:true}));
+   await wait(1200);
+   const info=win.__BLEACH_FRAME_DEBUG__;
+   say(name+' @ '+t+': '+JSON.stringify({info,pixels:pixels(doc.getElementById('visual'))}));
+  }
+ }
+ const overflow=doc.documentElement.scrollWidth>iframe.width+1;
+ say('mobile390 overflow='+overflow+' actualScrollWidth='+doc.documentElement.scrollWidth);
+ state.textContent='PASS';
+ }catch(e){state.textContent='FAIL';say(String(e?.stack||e));}
+ finally{document.getElementById('test').disabled=false;}
+};
+</script>
