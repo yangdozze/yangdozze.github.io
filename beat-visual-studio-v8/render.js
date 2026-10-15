@@ -1,5 +1,5 @@
 import {renderStrip,renderNight} from './akira-scenes.js';
-import {renderBleach} from './bleach-scene.js';
+import {renderBleach} from './bleach-scene.js?v=m20261016c';
 export const MODES=[
 {id:'strip',name:'STRIP',type:'midi+audio'},
 {id:'night',name:'NIGHT',type:'midi+audio'},
