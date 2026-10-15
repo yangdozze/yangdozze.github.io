@@ -1,0 +1,68 @@
+<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Beat Visual Studio v7 — Mobile & Audio QA</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font:14px system-ui;background:#e9e9ed;color:#20202a}header{position:sticky;top:0;background:#fff;z-index:10;padding:12px 18px;box-shadow:0 2px 10px #2222}
+h1{font-size:18px;margin:0}p{margin:4px 0 0;color:#6a6570}.tests{display:flex;align-items:flex-start;gap:24px;flex-wrap:wrap;padding:18px}
+.device{width:auto;flex:none;background:#18181c;border:8px solid #18181c;border-radius:28px;overflow:hidden;box-shadow:0 10px 30px #1114}
+.device header{position:static;color:#fff;background:#18181c;box-shadow:none;font-size:12px}
+.device iframe{border:0;display:block;background:#fafafa}.panel{background:#fff;padding:14px;margin:18px;border-radius:12px}
+#report{white-space:pre-wrap;font:12px ui-monospace,monospace;line-height:1.5}
+.status{font-weight:700}button{font:inherit;min-height:42px;border-radius:8px;border:1px solid #aaa;padding:8px 12px;background:#fafafa;cursor:pointer}
+</style></head><body><header><h1>Beat Visual Studio v7 — QA / только тестовый инструмент</h1><p>Внутри отдельных iframe запускается настоящая v7 с мобильными viewport 390×844 и 320×700. Основной сайт не изменяется.</p></header>
+<section class="tests">
+<div class="device"><header>iPhone width · 390×844</header><iframe id="phone390" title="390px viewport" width="390" height="844" src="./?qa=390"></iframe></div>
+<div class="device"><header>Narrow phone · 320×700</header><iframe id="phone320" title="320px viewport" width="320" height="700" src="./?qa=320"></iframe></div>
+</section>
+<div class="panel"><button id="audit">Проверить размеры, реальные аудиокадры и переходы</button><span class="status" id="state">Ещё не проверено</span><pre id="report">При загрузке оба iframe полностью интерактивны. Нажми «Проверить».</pre></div>
+<script>
+const state=document.querySelector('#state'),report=document.querySelector('#report');
+const delay=ms=>new Promise(r=>setTimeout(r,ms));
+const out=[];
+const say=(s)=>{out.push(s);report.textContent=out.join('\n');};
+function pcmFile(){
+ const rate=22050,seconds=3,N=rate*seconds,data=new ArrayBuffer(44+N*2),v=new DataView(data);
+ const str=(offset,s)=>{for(let i=0;i<s.length;i++)v.setUint8(offset+i,s.charCodeAt(i))};
+ str(0,'RIFF');v.setUint32(4,36+N*2,true);str(8,'WAVE');str(12,'fmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);
+ v.setUint16(22,1,true);v.setUint32(24,rate,true);v.setUint32(28,rate*2,true);v.setUint16(32,2,true);v.setUint16(34,16,true);
+ str(36,'data');v.setUint32(40,N*2,true);
+ for(let i=0;i<N;i++){const t=i/rate,kick=Math.exp(-((t%0.5)*21)),s=Math.sin(2*Math.PI*88*t)*kick*.75+Math.sin(2*Math.PI*440*t)*Math.exp(-t*.25)*.08;
+ v.setInt16(44+i*2,Math.max(-32767,Math.min(32767,Math.floor(s*32767))),true);}
+ return new File([data],'qa-synthetic.wav',{type:'audio/wav'});
+}
+function pixHash(canvas){
+ const ctx=canvas.getContext('2d'),w=canvas.width,h=canvas.height,vals=ctx.getImageData(0,0,w,h).data;
+ let hash=2166136261;for(let i=0;i<vals.length;i+=47){hash^=vals[i];hash=Math.imul(hash,16777619)}
+ return (hash>>>0).toString(16);
+}
+async function auditFrame(frame) {
+ const w=frame.width,h=frame.height,win=frame.contentWindow,doc=win.document,name=frame.id;
+ let tries=0;while(!doc.getElementById('visual')&&tries++<40)await delay(200);
+ if(!doc.getElementById('visual')){say(name+': ❌ no canvas, module load failed');return;}
+ const width=doc.documentElement.scrollWidth,style=win.getComputedStyle(doc.querySelector('main')),main=doc.querySelector('main'),aspect=doc.querySelector('canvas').width/doc.querySelector('canvas').height;
+ const violations=[...doc.querySelectorAll('button,input,select,a')].filter(e=>{const r=e.getBoundingClientRect(),cs=win.getComputedStyle(e);return cs.display!=='none'&&r.width>0&&(r.x<-1||r.right>w+1);}).slice(0,9).map(e=>e.tagName+'#'+e.id+' '+Math.round(e.getBoundingClientRect().right));
+ say(name+': viewport='+w+'×'+h+', scrollWidth='+width+', main display='+style.display+', canvas aspect='+aspect.toFixed(3)+', overflow controls='+JSON.stringify(violations));
+ const canvas=doc.getElementById('visual');
+ const wav=pcmFile(),input=doc.querySelector('#audioFile'),dt=new win.DataTransfer();dt.items.add(wav);input.files=dt.files;
+ input.dispatchEvent(new win.Event('change',{bubbles:true}));
+ let ok=false;for(let i=0;i<70;i++){await delay(100);if(doc.querySelector('#audioName').textContent==='qa-synthetic.wav'){ok=true;break;}}
+ say(name+': audio import '+(ok?'OK':'TIMEOUT')+'; source='+doc.querySelector('#sourceStatus').textContent);
+ if(!ok)return;
+ for(const title of ['CAUSTIC','DISPLACED','THERMAL']) {
+  const button=[...doc.querySelectorAll('#looks .look')].find(e=>e.textContent.includes(title));
+  if(!button){say(name+': ❌ Missing '+title);continue;}button.click();await delay(1000);
+  const seek=doc.querySelector('#seek');
+  seek.value='.4';seek.dispatchEvent(new win.Event('input',{bubbles:true}));await delay(750);const a=pixHash(canvas);
+  seek.value='1.3';seek.dispatchEvent(new win.Event('input',{bubbles:true}));await delay(750);const b=pixHash(canvas);
+  say(name+': '+title+' frame hashes '+a+' / '+b+'; motion='+ (a!==b?'CHANGED':'STATIC')+'; tracker='+JSON.stringify(win.__BLEACH_FRAME_DEBUG__?.trackerCount??null));
+ }
+ doc.querySelector('#aspect').value='landscape';doc.querySelector('#aspect').dispatchEvent(new win.Event('input',{bubbles:true}));
+ await delay(200);
+ let rect=canvas.getBoundingClientRect();say(name+': 16:9 canvas ratio='+Math.round(rect.width/rect.height*100)/100+' expected 1.78');
+}
+document.getElementById('audit').onclick=async()=>{
+ document.getElementById('audit').disabled=true;state.textContent='Проверка...';out.length=0;
+ try{for(const id of ['phone390','phone320'])await auditFrame(document.getElementById(id));state.textContent='Завершено';}
+ catch(e){say('ERROR: '+(e?.stack||e));state.textContent='Ошибка QA';}
+ finally{document.getElementById('audit').disabled=false;}
+};
+</script></body></html>
