@@ -173,3 +173,16 @@ input,select,button{touch-action:manipulation}
  width:min(100vw,177.77778dvh)!important;
  max-height:100dvh!important;height:auto!important
 }
+
+/* v7 legibility pass. Keep narrow controls tappable without shrinking labels. */
+@media(max-width:760px){
+ .panel .hint,.preview-note,.panel>p{font-size:12px!important;line-height:1.55}
+ .panel label,.row label,.toggles label{font-size:13px;line-height:1.45}
+ .row.three label{font-size:12px!important}
+ .row.three input,.row.three select{font-size:13px!important}
+ .look-name{font-size:13px!important;line-height:1.25!important}
+ .look-name small{font-size:11px!important}
+ .section-title h2{font-size:16px}
+ .style-queue>.look{min-height:70px}
+ .stage-column .overline{font-size:10px!important}
+}
