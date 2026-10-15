@@ -14,6 +14,7 @@ h1{font-size:18px;margin:0}p{margin:4px 0 0;color:#6a6570}.tests{display:flex;al
 <div class="device"><header>Narrow phone · 320×700</header><iframe id="phone320" title="320px viewport" width="320" height="700" src="./?qa=320"></iframe></div>
 </section>
 <div class="panel"><button id="audit">Проверить размеры, реальные аудиокадры и переходы</button><span class="status" id="state">Ещё не проверено</span><pre id="report">При загрузке оба iframe полностью интерактивны. Нажми «Проверить».</pre></div>
+<div class="panel"><button id="reactiontest">Проверка реакции на звук / тишину при одинаковом t=0.4</button><span class="status" id="reactionstate">Ещё не проверено</span><pre id="reactionreport">Сравнение пикселей аудиореактивной сцены для тишины, баса 70 Гц и звука 4 кГц в одинаковый момент.</pre></div>
 <div class="panel"><button id="exporttest">Тест покадрового экспорта MP4/WebM — 30 fps</button><span class="status" id="exportstate">Ещё не проверено</span><pre id="exportreport">Отдельный тест WebCodecs + реального PCM · 30 кадров/сек. Никаких файлов пользователю не выгружается.</pre><video id="preview-test" preload="metadata" muted playsinline controls style="display:block;max-width:210px;max-height:310px"></video></div>
 <script>
 const state=document.querySelector('#state'),report=document.querySelector('#report');
@@ -87,6 +88,30 @@ document.getElementById('exporttest').onclick=async()=>{
   await new Promise((resolve,reject)=>{video.onloadedmetadata=resolve;video.onerror=()=>reject(Error('exported video unreadable in browser'));setTimeout(()=>reject(Error('video metadata timeout')),20000);});
   report.textContent+=' | duration='+video.duration.toFixed(3)+'s | videoWidth='+video.videoWidth+' | videoHeight='+video.videoHeight;
   status.textContent=(Math.abs(video.duration-1)<0.15&&result.frames===30)?'PASS':'CHECK';
+ }catch(e){status.textContent='FAIL';report.textContent=String(e?.stack||e)}
+ finally{button.disabled=false}
+};
+
+document.getElementById('reactiontest').onclick=async()=>{
+ const button=document.getElementById('reactiontest'),status=document.getElementById('reactionstate'),report=document.getElementById('reactionreport');
+ button.disabled=true;status.textContent='Проверка...';
+ try{
+  const m=await import('./bleach-scene.js'),ac=new AudioContext({sampleRate:48000});
+  const make=(f)=>{const b=ac.createBuffer(1,48000*3,48000);if(f){const pcm=b.getChannelData(0);for(let i=0;i<pcm.length;i++)pcm[i]=Math.sin(Math.PI*2*f*i/48000)*.72;}return b;};
+  const audio=[['silence',make(0)],['bass70Hz',make(70)],['high4000Hz',make(4000)]],pairs=[];
+  for(const mode of ['bleach','displaced','thermal']){
+   const hashes=[];
+   for(const [name,b] of audio){
+    const cv=document.createElement('canvas');cv.width=320;cv.height=568;
+    m.setBleachAudioSource(b);
+    m.renderBleach(cv.getContext('2d',{alpha:false}),cv.width,cv.height,0.4,{mode,react:1},{audioLoop:false},false);
+    hashes.push(name+'='+pixHash(cv));
+   }
+   pairs.push(mode+': '+hashes.join(' vs '));
+  }
+  report.textContent=pairs.join('\n');
+  status.textContent=pairs.every(x=>new Set(x.split(' vs ').map(v=>v.split('=')[1])).size>1)?'PASS — отличается от тишины':'CHECK — некоторая сцена не реагирует';
+  await ac.close();
  }catch(e){status.textContent='FAIL';report.textContent=String(e?.stack||e)}
  finally{button.disabled=false}
 };
