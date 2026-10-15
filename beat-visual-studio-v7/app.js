@@ -108,7 +108,7 @@ async function deterministicExport(dur,start){
     if(downloadURL)URL.revokeObjectURL(downloadURL);
     downloadURL=URL.createObjectURL(result.blob);
     const filename=($('titleText').value||'beat-visual')
-      .replace(/[^\\p{L}\\p{N}_-]+/gu,'_')+'.'+result.ext;
+      .replace(/[^\p{L}\p{N}_-]+/gu,'_')+'.'+result.ext;
     const link=document.createElement('a');
     link.href=downloadURL;link.download=filename;
     link.textContent=`Скачать ${result.ext.toUpperCase()} · ${result.frames} кадров · ${(result.blob.size/1048576).toFixed(1)} МБ`;
