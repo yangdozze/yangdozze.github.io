@@ -1,0 +1,61 @@
+<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>METHOD Caustic — original engine QA (BVS v8)</title><style>
+body{margin:0;padding:20px;background:#eeeefa;color:#202027;font:14px system-ui}h1{font-size:21px}
+main{display:flex;flex-wrap:wrap;gap:18px;align-items:flex-start}.preview{width:320px;background:#14151b;padding:8px;border-radius:12px;max-width:100%}
+.preview canvas{width:100%;display:block;aspect-ratio:9/16}button{border:1px solid #bbb;background:#fff;padding:13px 17px;border-radius:10px;font-weight:700;cursor:pointer}
+pre{white-space:pre-wrap;max-width:600px;font-size:12px;line-height:1.7;background:white;border-radius:10px;padding:15px;overflow-wrap:anywhere}
+</style></head><body>
+<h1>METHOD / 03 Bleach — исходный Caustic</h1>
+<p>Движок и адаптер METHOD, штатное разрешение 540×960. Один и тот же тестовый аудиосигнал, три состояния кадра.</p>
+<button id="test">Проверить оригинальный рендер, трекеры и движение</button><strong id="state">Ещё не тестировалось</strong>
+<main><div class="preview"><canvas width="540" height="960" id="shot"></canvas></div><pre id="log">Здесь появятся измерения.</pre></main>
+<script type="module">
+import {CausticAdapter} from './method-caustic-adapter.js';
+import {CAUSTIC} from './caustic-core.js';
+const log=document.querySelector('#log'),state=document.querySelector('#state'),out=document.querySelector('#shot');
+const report=[];const push=s=>{report.push(s);log.textContent=report.join('\n');};
+const sleep=()=>new Promise(resolve=>setTimeout(resolve,0));
+const sampleRate=44100;
+function pcm(){
+ const len=sampleRate*4,a=new Float32Array(len);
+ for(let i=0;i<len;i++){const t=i/sampleRate,k=t%.5,s=(t+.25)%1;
+ const kick=Math.sin(2*Math.PI*(55+36*Math.exp(-k*42))*k)*Math.exp(-k*15)*.95;
+ const snare=Math.sin(i*44.1)*Math.exp(-s*43)*.24;
+ const bass=Math.sin(2*Math.PI*110*t)*.13;
+ const hat=Math.sin(i*17.31)*Math.exp(-(t%.125)*150)*.10;
+ a[i]=Math.tanh((kick+snare+bass+hat)*1.4);}
+ return a;
+}
+function stats(canvas){
+ const arr=canvas.getContext('2d',{willReadFrequently:true}).getImageData(0,0,canvas.width,canvas.height).data;
+ let nz=0,bright=0,col=0,minY=1e9,maxY=0;
+ for(let i=0;i<arr.length;i+=4){
+ const r=arr[i],g=arr[i+1],b=arr[i+2],a=Math.max(r,g,b);
+ if(a>=12){nz++;let y=Math.floor(i/4/canvas.width);minY=Math.min(y,minY);maxY=Math.max(y,maxY);}
+ if(a>=65)bright++;
+ if((Math.abs(r-g)>20||Math.abs(g-b)>20)&&a>30)col++;
+ }
+ return {above12:nz,above65:bright,coloredHUDPixels:col,occupiedY:[minY,maxY]};
+}
+document.querySelector('#test').onclick=async()=>{
+ document.querySelector('#test').disabled=true;state.textContent='Рендер идёт…';report.length=0;
+ try{
+ const p=pcm(),adapter=CausticAdapter.create(),c=adapter.canvas;
+ adapter.setAudio(p,sampleRate);adapter.set('displacement',1);adapter.set('speed',.97);adapter.set('tracker',.65);
+ CAUSTIC.TK.cap=17;
+ for(const look of ['disp','out']){
+  adapter.setLook(look);
+  for(const t of [.2,.6,1.05]){
+   const before=performance.now();adapter.frame(t,1/30);
+   const stat=stats(c),elapsed=Math.round(performance.now()-before);
+   push(look+' @ t='+t+': renderMs='+elapsed+', '+JSON.stringify(stat));
+   out.getContext('2d').drawImage(c,0,0,out.width,out.height);
+   await sleep();
+  }
+ }
+ push('Original METHOD size '+c.width+'x'+c.height+'; control '+JSON.stringify({displace:CAUSTIC.U.displacement,speed:CAUSTIC.U.speed,tracker:CAUSTIC.U.tracker,caption:CAUSTIC.TK.cap}));
+ state.textContent='PASS / завершено';
+ }catch(e){state.textContent='FAIL';push(String(e?.stack||e));}
+ finally{document.querySelector('#test').disabled=false;}
+};
+</script></body></html>
