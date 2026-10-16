@@ -1,0 +1,56 @@
+name: METHOD visual parity frames
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/method-visual-parity.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install visual test tools
+        run: |
+          npm install --no-save playwright@1.56.1 pngjs@7.0.0
+          npx playwright install --with-deps chromium
+      - name: Validate test script
+        run: node --check beat-visual-studio-v15-original/qa/compare.cjs
+      - name: Render and compare all METHOD looks
+        run: timeout 900s node beat-visual-studio-v15-original/qa/compare.cjs
+      - name: Build side-by-side comparison video
+        if: always()
+        shell: bash
+        run: |
+          if compgen -G 'method-parity-output/*.png' > /dev/null; then
+            python3 - <<'PY'
+          import json,os,datetime
+          path='method-parity-output/results.json'
+          if os.path.exists(path):
+              r=json.load(open(path))
+              with open('method-parity-output/captions.srt','w') as f:
+                  for i,s in enumerate(r['frames'],1):
+                      def ts(t):
+                          return str(datetime.timedelta(seconds=t)).split('.')[0].zfill(8)+',000'
+                      f.write(f"{i}\n{ts(i-1)} --> {ts(i)}\nMETHOD ORIGINAL (left) / VISUALZI V15 (right)\n{s['name']} — {s['look']} — t={s['t']}s — pixel MAE {s['mae']:.4f}\n\n")
+          PY
+            ffmpeg -y -hide_banner -loglevel error -framerate 1 -i method-parity-output/%04d.png -vf "subtitles=method-parity-output/captions.srt:force_style='Fontsize=18,Outline=2,Alignment=2,MarginV=10'" -c:v libx264 -pix_fmt yuv420p -r 24 method-parity-output/METHOD_VS_VISUALZI_ALL_LOOKS.mp4 ||             ffmpeg -y -hide_banner -loglevel error -framerate 1 -i method-parity-output/%04d.png -c:v libx264 -pix_fmt yuv420p -r 24 method-parity-output/METHOD_VS_VISUALZI_ALL_LOOKS.mp4
+          else
+            echo "NO_FRAMES — inspect comparison log."
+          fi
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: method-v15-visual-parity
+          path: method-parity-output/
+          if-no-files-found: warn
+          retention-days: 7
