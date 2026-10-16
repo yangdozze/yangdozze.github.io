@@ -1,4 +1,3 @@
-/* Beat Visual Studio v10: original METHOD engine family library 3/4. Original author METHOD / HiveGlobal; code reused with permission as represented by project owner. Original engine body below. */
 
 /* ===== READOUT ENGINE — beat-reading visualizers (METHOD 09 Grid, 10 Pads) =====
    From the approved Readout Lab (readout_lab_test_7.html): shared helpers, FFT, offline analysis (tempo, downbeat, key,

@@ -1,4 +1,3 @@
-/* Beat Visual Studio v10: original METHOD engine family library 4/4. Original author METHOD / HiveGlobal; code reused with permission as represented by project owner. Original engine body below. */
 
 /* ===== OSCILLOSCOPE — METHOD 11 (from oscilloscope_3d_test_7.html) =====
    Fonts (window.__OSC_FONTS), three.js r186 (MIT, window.THREE) and the instrument: sections 01-08b as on the test page,

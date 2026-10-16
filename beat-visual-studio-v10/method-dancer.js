@@ -1,4 +1,3 @@
-/* Beat Visual Studio v10: original METHOD engine family library 2/4. Original author METHOD / HiveGlobal; code reused with permission as represented by project owner. Original engine body below. */
 
 /* ===== DANCER ENGINE — photo → low-poly PS2-era character that dances to the beat =====
    Self-contained (raw WebGL2, no libraries). Public object: window.DancerEngine */

@@ -1,4 +1,3 @@
-/* Beat Visual Studio v10: original METHOD engine family library 1/4. Original author METHOD / HiveGlobal; code reused with permission as represented by project owner. Original engine body below. */
 
 /* ======================= VISUAL ENGINES (approved builds, logic untouched) ======================= */
 /* ===========================================================================
