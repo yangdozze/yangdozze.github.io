@@ -1,0 +1,54 @@
+name: Package verified METHOD comparison videos
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/method-package-comparisons.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+      - name: Download verified default-look frames (11/11)
+        uses: actions/download-artifact@v4
+        with:
+          name: method-v15-quick-parity
+          run-id: 38945821618
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: quick
+      - name: Download verified full-look frames (58 frames)
+        uses: actions/download-artifact@v4
+        with:
+          name: method-v15-visual-parity
+          run-id: 38944930190
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: looks
+      - name: Build comparison MP4s
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p output
+          ffmpeg -y -hide_banner -loglevel error -framerate 1 -i quick/%04d.png -c:v libx264 -pix_fmt yuv420p -r 24 output/METHOD_VS_VISUALZI_11_ENGINES.mp4
+          ffmpeg -y -hide_banner -loglevel error -framerate 1 -i looks/%04d.png -c:v libx264 -pix_fmt yuv420p -r 24 output/METHOD_VS_VISUALZI_58_LOOKS.mp4
+          cp quick/REPORT.md output/REPORT_11_ENGINES.md
+          cp looks/REPORT.md output/REPORT_58_LOOKS.md
+          cp quick/results.json output/RESULTS_11_ENGINES.json
+          cp looks/results.json output/RESULTS_58_LOOKS.json
+          du -h output/*
+      - name: Publish downloadable videos and detailed results
+        uses: actions/upload-artifact@v4
+        with:
+          name: method-v15-verified-videos
+          path: output/
+          retention-days: 7
