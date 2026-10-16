@@ -16,16 +16,16 @@ window.parseTrackName=function(input){const clean=String(input||'').split(/[\\/]
 <script src="../beat-visual-studio-v10/method-registry.js"></script>
 <script>
 window.METHOD_V10.audio=AudioEngine;
-const $=id=>document.getElementById(id),report=[];
+const qaEl=id=>document.getElementById(id),qaReport=[];
 function signal(){const sr=44100,n=sr*2,p=new Float32Array(n);for(let i=0;i<n;i++){const t=i/sr,beat=t%.5;const kick=Math.sin(2*Math.PI*65*t)*Math.exp(-beat*28);p[i]=Math.tanh(.8*kick+.15*Math.sin(2*Math.PI*220*t)+.08*Math.sin(2*Math.PI*3600*t));}return{pcm:p,sr};}
 function digest(c){const ctx=c.getContext('2d');if(ctx){const data=ctx.getImageData(0,0,Math.min(32,c.width),Math.min(32,c.height)).data;let sum=0,col=0;for(let i=0;i<data.length;i+=4){const v=data[i]+data[i+1]+data[i+2];sum=(Math.imul(sum,33)+v)>>>0;if(v>18)col++;}return sum.toString(16)+':'+col;}return 'gpu/not-readback';}
 async function run(){
- const b=$('run');b.disabled=true;const s=signal();const list=METHOD_V10.ENGINES;report.length=0;
+ const b=qaEl('run');b.disabled=true;const s=signal();const list=METHOD_V10.ENGINES;qaReport.length=0;
  const C=window.AudioContext||window.webkitAudioContext;const context=new C(),buf=context.createBuffer(1,s.pcm.length,s.sr);buf.copyToChannel(s.pcm,0);
  AudioEngine._set(s.pcm,s.sr,buf,'QA synthetic beat',true);
  for(const [i,E]of list.entries()){
-  $('status').textContent='Engine '+(i+1)+'/'+list.length+': '+E.name;
-  const row=document.createElement('tr');row.innerHTML='<td>'+E.name+'</td><td>…</td><td>…</td><td>…</td><td>running</td>';$('results').append(row);
+  qaEl('status').textContent='Engine '+(i+1)+'/'+list.length+': '+E.name;
+  const row=document.createElement('tr');row.innerHTML='<td>'+E.name+'</td><td>…</td><td>…</td><td>…</td><td>running</td>';qaEl('results').append(row);
   let inst=null,record={id:E.id,name:E.name,source:'method-original',firstMs:null,secondMs:null,pixels:null,error:null};
   try{
     App.vid=E.id;inst=E.create();inst.setAspect?.('9:16');inst.setMode?.(E.modes?.def||'');inst.setLook?.(E.defaultLook||E.looks?.[0]?.k);
@@ -37,14 +37,14 @@ async function run(){
     const next=performance.now();inst.frame(.9,1/30,true);record.secondMs=Math.round(performance.now()-next);
     const z=digest(inst.canvas);record.pixels=a+' / '+z;
   }catch(e){record.error=String(e?.stack||e).slice(0,400);}
-  report.push(record);row.cells[1].textContent=record.pixels||'-';row.cells[2].textContent=record.firstMs??'-';row.cells[3].textContent=record.secondMs??'-';row.cells[4].textContent=record.error?'ERROR: '+record.error.slice(0,60):'no exception';
-  $('json').textContent=JSON.stringify(report,null,2);
+  qaReport.push(record);row.cells[1].textContent=record.pixels||'-';row.cells[2].textContent=record.firstMs??'-';row.cells[3].textContent=record.secondMs??'-';row.cells[4].textContent=record.error?'ERROR: '+record.error.slice(0,60):'no exception';
+  qaEl('json').textContent=JSON.stringify(qaReport,null,2);
   try{const gl=inst?.canvas?.getContext('webgl2');gl?.getExtension('WEBGL_lose_context')?.loseContext()}catch(e){}
   inst=null;
   await new Promise(r=>setTimeout(r,60));
  }
- $('status').textContent='Completed: '+report.length+' native engines; exceptions: '+report.filter(x=>x.error).length;b.disabled=false;
+ qaEl('status').textContent='Completed: '+qaReport.length+' native engines; exceptions: '+qaReport.filter(x=>x.error).length;b.disabled=false;
 }
-$('run').onclick=run;
+qaEl('run').onclick=run;
 if(location.search.includes('autorun=1'))setTimeout(run,500);
 </script></body></html>
