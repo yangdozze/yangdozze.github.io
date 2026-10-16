@@ -1,39 +1,37 @@
-<!doctype html>
-<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#f8f8f6">
-<title>Beat Visual Studio v10 — METHOD Library</title>
-<meta name="description" content="Beat Visual Studio. Native METHOD visualizer library: 11 families, audio and MIDI, original presets and parameter controls.">
-<link rel="stylesheet" href="./studio.css?v=2"></head>
-<body>
-<header class="sitehead"><a class="brand" href="../beat-visual-studio-v9/">BVS<span class="slash">/</span>METHOD <small>v10 TEST</small></a><div class="headright"><span class="local">Локальная обработка медиа</span><a class="mini-link" href="../beat-visual-studio-v9/">Версия v9 ↗</a><a class="mini-link" href="https://method.hiveglobal.org/app/" target="_blank" rel="noopener">Оригинал METHOD ↗</a></div></header>
+<!DOCTYPE html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#F4F4F0">
+<title>Beat Visual Studio v10 — METHOD Engines</title><meta name="description" content="Native audio-reactive METHOD styles with direct MIDI, original controls and frame-accurate local exports.">
+<link rel="stylesheet" href="./style.css?v=10a"></head><body>
+<header class="top"><a class="brand" href="./"><span class="mark">◈</span><span>BEAT VISUAL<br><em>STUDIO</em></span></a><span class="version">v10 · METHOD LAB</span><a class="prev" href="../beat-visual-studio-v9/">v9 <span>↗</span></a></header>
 <main>
-<div class="intro"><div><span class="eyebrow">БИБЛИОТЕКА METHOD · 11 СЕМЕЙСТВ · 01—11</span><h1>Твой звук.<br><em>Любая визуальная форма.</em></h1><p>Прямое подключение оригинальных движков METHOD в Beat Visual Studio. Каждый стиль со своими исходными вариантами и настройками.</p></div><div class="counter"><strong id="counter">11</strong><span>семейств визуализации</span></div></div>
-<div id="status" role="status" aria-live="polite">Инициализация движков…</div>
 <section class="workspace">
- <div class="stagecol">
-   <div class="stagehead"><span class="eyebrow">LIVE PREVIEW / РЕАЛЬНЫЙ ДВИЖОК</span><strong id="sceneName">METHOD</strong></div>
-   <div class="stageouter" id="stageOuter"><canvas id="outCanvas" width="540" height="960"></canvas><div id="stagePlaceholder">Загрузи WAV/MP3 или MIDI<br><small>Для некоторых сцен доступны встроенные демонстрационные данные METHOD</small></div></div>
-   <div class="transport"><button id="play" class="playbutton" aria-label="Воспроизвести">▶</button><button id="rewind" class="subbutton" aria-label="В начало">↺</button><input id="seek" type="range" min="0" max="1" step="0.001" value="0" aria-label="Позиция"><span id="clock">0:00 / 0:00</span><button id="fullscreen" class="subbutton" aria-label="Во весь экран">⛶</button></div>
-   <div class="sourcebar"><label class="filebtn"><input type="file" id="audioFile" accept="audio/*,.wav,.mp3,.m4a,.flac,.ogg">+ Аудио</label><label class="filebtn"><input type="file" id="midiFile" accept=".mid,.midi,.rmi,audio/midi">+ MIDI</label><label class="filebtn" id="photoLabel"><input type="file" id="photoFile" accept="image/png,image/jpeg,image/webp">+ Фото</label><span id="audioName">Медиа не загружено</span></div>
-   <div class="exportbar"><label>Формат<select id="aspect"><option value="9:16">9:16 / Reels</option><option value="16:9">16:9 / YouTube</option></select></label><label>FPS<select id="fps"><option value="30">30 FPS</option><option value="24">24 FPS</option><option value="60">60 FPS</option></select></label><label>Длина, сек<input id="exportDuration" type="number" min="1" max="180" step="1" value="8"></label><button id="imageExport">PNG кадр</button><button id="videoExport" class="primary">Экспорт видео</button><button id="cancelExport" hidden>Отменить</button></div>
-   <progress id="exportProgress" hidden max="1" value="0"></progress>
-   <p id="exportNote" class="note">Видео экспортируется по фиксированным временным меткам. MP4 при поддержке кодеков, иначе WebM. Не закрывай вкладку во время экспорта.</p>
- </div>
- <aside class="editcol">
-   <section class="block"><div class="blockhead"><h2>01 / Семейство</h2><span id="familyCount">11 / 11</span></div><div class="familygrid" id="families"></div></section>
-   <section class="block"><div class="blockhead"><h2>02 / Стиль</h2><span id="lookCount"></span></div><div class="looks" id="looks"></div></section>
-   <section class="block" id="modesBlock"><div class="blockhead"><h2>03 / Вариант</h2></div><div id="modes"></div></section>
-   <section class="block"><div class="blockhead"><h2>04 / Параметры оригинала</h2><button id="resetParams" class="textbtn">Сбросить</button></div><div id="params"></div></section>
-   <section class="block"><div class="blockhead"><h2>05 / Эффекты METHOD</h2><button id="resetFx" class="textbtn">Сбросить</button></div><p class="hint">Оригинальный WebGL2-процессор METHOD. Эффекты применяются поверх рендера и не меняют исходную геометрию.</p><div id="fx"></div></section>
-   <section class="block"><div class="blockhead"><h2>06 / Цветокоррекция</h2><button id="resetGrade" class="textbtn">Сбросить</button></div><div id="grade"></div></section>
-   <section class="block"><div class="blockhead"><h2>07 / Пресеты</h2></div><div class="row"><button id="savePreset">Сохранить JSON</button><label class="filebtn"><input type="file" id="loadPreset" accept=".json,application/json">Открыть JSON</label></div><p class="hint">Сохраняются выбранное семейство, стиль, исходные параметры, эффекты и цвет.</p></section>
- </aside>
+<div class="caption-row"><span>◉ LIVE CANVAS</span><span id="modeName">01 / STRIP</span></div>
+<div class="stage" id="stage"><canvas id="visual" width="540" height="960" aria-label="Музыкальная визуализация"></canvas>
+<div class="floating"><button id="fullscreen" aria-label="Развернуть сцену">⛶</button><button id="exitFullscreen" aria-label="Свернуть сцену" hidden>×</button></div></div>
+<div class="transport"><button id="play" class="play">▶</button><button id="rewind" title="В начало">↺</button><span id="clock">0:00 / 0:08</span><input type="range" id="seek" min="0" max="8" step=".001" value="0" aria-label="Позиция трека"></div>
+<div class="status" id="status">DEMO · синтетический бит для предпросмотра, не запись твоего аудио</div>
+<div class="progress-meta"><span id="perf">Preview · 30 FPS target</span><span id="canvasSize">9:16 · 540×960</span></div>
 </section>
-<footer><strong>Beat Visual Studio / METHOD Library — v10 тест</strong><p>Исходные визуальные движки, библиотеки стилей, адаптеры и FX: <a href="https://method.hiveglobal.org/app/" target="_blank" rel="noopener">METHOD / HiveGlobal</a>. Код используется согласно сообщённому владельцем Beat Visual Studio разрешению автора; авторские права сохраняются. Система оплаты, аккаунтов и серверных API оригинального сайта не копируется. Дополнительные модели/данные некоторых движков могут загружаться с внешних адресов оригинальных разработчиков. STRIP и NIGHT доступны в <a href="../beat-visual-studio-v9/">v9</a>. Экспериментальный Audio-to-MIDI из BVS не возвращён; MIDI/Score здесь является оригинальным модулем METHOD.</p></footer>
+<aside class="editor">
+<section class="panel"><div class="panel-head"><span class="eyebrow">01 / SOURCE</span><h2>Твои файлы</h2></div>
+<div class="file-grid"><label class="drop"><span>♫</span><strong>WAV / MP3 / M4A</strong><small id="audioName">Загрузить аудио</small><input id="audioFile" type="file" accept="audio/*,.wav,.mp3,.m4a"></label>
+<label class="drop"><span>▤</span><strong>Настоящий MIDI</strong><small id="midiName">.mid / .midi (без Audio-to-MIDI)</small><input id="midiFile" type="file" accept=".mid,.midi,audio/midi"></label></div></section>
+<section class="panel"><div class="panel-head"><span class="eyebrow">02 / ENGINE LIBRARY</span><h2>Визуализаторы <span id="styleCount"></span></h2></div>
+<div id="families" class="families"></div><div class="look-head">ОФОРМЛЕНИЯ ОРИГИНАЛА</div><div id="looks" class="looks"></div></section>
+<section class="panel" id="originalPanel"><div class="panel-head"><span class="eyebrow">03 / ORIGINAL ENGINE CONTROLS</span><h2 id="controlTitle">Настройки</h2><p id="engineInfo" class="sub"></p></div>
+<div id="modeSelectWrap" class="choice" hidden><label for="modeSelect" id="modeSelectTitle">Camera</label><select id="modeSelect"></select></div>
+<div id="knobs" class="knobs"></div><details id="advanced"><summary>Все расширенные параметры <span id="advCount"></span></summary><div id="advancedKnobs" class="knobs"></div></details>
+<button id="resetParams" class="small-button">Сбросить параметры стиля</button></section>
+<section class="panel"><div class="panel-head"><span class="eyebrow">04 / OUTPUT</span><h2>Экспорт</h2></div>
+<div class="settings">
+<label>Кадр<select id="aspect"><option value="9:16">9:16 · TikTok / Reels</option><option value="16:9">16:9 · YouTube</option></select></label>
+<label>Разрешение<select id="resolution"><option value="540">540p · быстрый тест</option><option value="720">720p</option><option value="1080">1080p</option></select></label>
+<label>FPS<select id="fps"><option value="24">24</option><option value="30" selected>30</option></select></label>
+<label>Отрывок, сек<input id="duration" type="number" min="1" max="180" value="8"></label></div>
+<div class="effect-controls"><label>Brightness <output id="brightnessVal">100%</output><input id="brightness" type="range" min="35" max="180" value="100"></label><label>Contrast <output id="contrastVal">100%</output><input id="contrast" type="range" min="50" max="175" value="100"></label><label><input id="negative" type="checkbox"> Negative</label></div>
+<div class="action"><button id="exportVideo">Экспорт MP4 / WebM со звуком</button><button id="exportPNG" class="secondary">PNG кадр</button></div>
+<progress id="exportProgress" value="0" max="100" hidden></progress><p id="exportStatus" class="sub">Покадровый экспорт через WebCodecs. Сложным WebGL-сценам может потребоваться время.</p><div class="action secondary-actions"><button id="presetSave" class="secondary">Сохранить пресет JSON</button><label class="secondary upload-preset">Открыть JSON<input id="presetLoad" type="file" accept=".json,application/json"></label></div>
+</section></aside>
 </main>
-<script defer src="./native-a-retro-caustic-contour-dust-spatial-volume-midi.js"></script>
-<script defer src="./native-b-dancer.js"></script>
-<script defer src="./native-c-readout.js"></script>
-<script defer src="./native-d-oscilloscope.js"></script>
-<script defer src="./native-registry.js?v=2"></script>
-<script defer src="./studio.js?v=2"></script>
-</body></html>
+<footer>Beat Visual Studio by yangdozze · METHOD native engines by <a href="https://method.hiveglobal.org/app/#/caustic" rel="noopener" target="_blank">METHOD / HiveGlobal</a>. Авторство сохранено, использование кода основано на заявленном владельцем проекта разрешении. Это отдельная тестовая сборка v10, без авторизации и оплаты, не официальный METHOD. Аудио и MIDI остаются в браузере. <a href="../beat-visual-studio-v9/">Вернуться к проверенному v9 ↗</a></footer>
+<script type="module" src="./studio.js?v=10a"></script></body></html>
