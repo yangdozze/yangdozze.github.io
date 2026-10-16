@@ -1612,4 +1612,4 @@ function createPost2D(canvas){
 
 
 /* BVS integration exports only; original adapter implementations above remain unchanged */
-window.METHOD_LIBRARY = Object.freeze({engines:ENGINES, adapters:ENG, effects:FX, audio:AudioEngine, post:createPost, post2d:createPost2D, format:paramFmt});
+window.METHOD_LIBRARY = Object.freeze({engines:ENGINES, adapters:ENG, effects:FX, audio:AudioEngine, post:createPost, post2d:createPost2D, format:paramFmt, fxDefaults:defaultFx, gradeDefaults:defaultGrade, gradeControls:GRADE_ADJ, gradientPalettes:GRAD_PALETTES});
