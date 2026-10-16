@@ -1,0 +1,59 @@
+<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>METHOD 11 Engine Native Smoke Test</title><style>body{font:14px system-ui;background:#101116;color:#f2f3f8;margin:0;padding:18px;max-width:900px}h1{font-size:22px}button{border:none;background:#c8bfff;color:#181523;padding:12px 18px;border-radius:10px;font-weight:700;font-size:15px}pre{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.6;background:#1d1f28;padding:17px;border-radius:12px}canvas{width:180px;height:320px;object-fit:contain;background:#020204;border:1px solid #444}</style></head><body>
+<h1>METHOD Original JS — все 11 движков</h1>
+<p>Запуск по одному, исходные функции create / setAudio / frame, без VISUALZI-обвязки и второго Canvas в предпросмотре. Только диагностическая страница.</p>
+<button id="run">Проверить все 11</button><p id="status">Ожидание</p><pre id="report"></pre><canvas id="stage" width="90" height="160"></canvas>
+<script>window.App={view:'ws',vid:'midi',advTab:'vis',advOpen:false};window.parseTrackName=function(a){return {title:String(a||''),artist:''}};</script>
+<script src="../beat-visual-studio-v10/method-visual-engines.js"></script>
+<script src="../beat-visual-studio-v10/method-dancer.js"></script>
+<script src="../beat-visual-studio-v10/method-readout.js"></script>
+<script src="../beat-visual-studio-v10/method-oscilloscope.js"></script>
+<script src="../beat-visual-studio-v10/method-registry.js"></script>
+<script src="./method-midi-original.js"></script><script>window.METHOD_V10.audio=AudioEngine;</script>
+<script>
+const show=msg=>{const el=document.querySelector('#report');el.textContent+=msg+'\n';console.log(msg)};
+let errors=[];
+window.addEventListener('error',e=>errors.push(e.message));
+window.addEventListener('unhandledrejection',e=>errors.push(String(e.reason?.message||e.reason)));
+function hashSample(src){
+ const c=document.querySelector('#stage'),g=c.getContext('2d',{alpha:false,willReadFrequently:true});
+ g.clearRect(0,0,c.width,c.height);g.drawImage(src,0,0,c.width,c.height);
+ const pixels=g.getImageData(0,0,c.width,c.height).data;let h=2166136261,bright=0;
+ for(let i=0;i<pixels.length;i+=16){h=Math.imul(h^pixels[i],16777619);h=Math.imul(h^pixels[i+1],16777619);if(pixels[i]+pixels[i+1]+pixels[i+2]>60)bright++}
+ return {hash:(h>>>0).toString(16),bright};
+}
+function signal(){const sr=22050,n=sr*2,pcm=new Float32Array(n);for(let i=0;i<n;i++){const t=i/sr,k=t%0.5;pcm[i]=Math.tanh(.65*Math.sin(2*Math.PI*70*t)*Math.exp(-k*18)+.12*Math.sin(2*Math.PI*400*t)+.07*Math.sin(2*Math.PI*920*t));}return {pcm,sr}}
+async function test(E){
+ const track=signal(),row={id:E.id,name:E.name,looks:E.looks?.length,params:E.params?.length,cost:E.cost||'',frames:[],errors:[],steps:[]};
+ let inst=null;
+ try{
+  const started=performance.now();window.App.vid=E.id;inst=E.create();row.initMs=Math.round(performance.now()-started);row.steps.push('created');
+  if(inst.setAspect)inst.setAspect('9:16');if(inst.setLook)inst.setLook(E.defaultLook);
+  if(inst.setMode&&E.modes)inst.setMode(E.modes.def);
+  for(const p of E.params||[]){const v=window.METHOD_V10.defOf(p,E.modes?.def);inst.set?.(p.k,v)}
+  const ana=performance.now();
+  if(E.id==='midi')inst.setAudio(null,44100);
+  else{const ret=inst.setAudio(track.pcm,track.sr);if(ret?.then)await ret}
+  row.setAudioMs=Math.round(performance.now()-ana);
+  if(inst.ready){const ready=inst.ready();if(ready?.then)await Promise.race([ready,new Promise(r=>setTimeout(r,3500))])}
+  for(const t of [.25,.65]){
+   const start=performance.now();inst.frame(t,1/30,true);
+   const ms=Math.round(performance.now()-start);
+   let pic;try{pic=hashSample(inst.canvas)}catch(e){pic={hash:null,bright:null,error:String(e.message||e)}}
+   row.frames.push({t,ms,...pic});
+  }
+ }catch(e){row.errors.push(String(e.stack||e).slice(0,500))}
+ row.globalErrors=errors.splice(0);
+ try{inst?.dispose?.()}catch(e){row.errors.push('dispose '+String(e))}
+ return row;
+}
+document.querySelector('#run').onclick=async()=>{
+ const b=document.querySelector('#run');b.disabled=true;document.querySelector('#report').textContent='';const report=[];
+ for(const E of window.METHOD_V10.ENGINES){
+  document.querySelector('#status').textContent='Проверка '+E.num+' '+E.name+'…';
+  await new Promise(r=>setTimeout(r,40));
+  const result=await test(E);report.push(result);show(JSON.stringify(result));
+ }
+ document.querySelector('#status').textContent='Готово: '+report.length+' семейcтв';
+ window.__METHOD_11_QA__=report;b.disabled=false;
+};
+</script></body></html>
