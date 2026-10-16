@@ -12,6 +12,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Fetch video comparison results
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: method-v15-verified-videos
+          run-id: 38947257484
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: method-comparison-videos
       - name: Create standalone source package
         shell: bash
         run: |
@@ -21,6 +29,88 @@ jobs:
           cp -a beat-visual-studio-v10 output/pack/VISUALZI_STUDIO/
           cp -a beat-visual-studio-v9 output/pack/VISUALZI_STUDIO/
           cp -a beat-visual-studio-v14-method-audio/METHOD_PARITY_QA.md output/pack/VISUALZI_STUDIO/METHOD_PARITY_QA.md
+          mkdir -p output/pack/VISUALZI_STUDIO/QA_RESULTS
+          if test -d method-comparison-videos; then
+            cp -a method-comparison-videos/. output/pack/VISUALZI_STUDIO/QA_RESULTS/
+          fi
+          cat > output/pack/VISUALZI_STUDIO/НА_ЧЕМ_ОСТАНОВИЛИСЬ.md <<'STATUS'
+          # VISUALZI — НА ЧЁМ ОСТАНОВИЛИСЬ (16.10.2026)
+
+          ## Текущий рабочий этап
+          Мы остановились на переносе METHOD без переписывания движков и проверке,
+          совпадают ли движения и итоговые кадры всех стилей.
+          Текущая сборка: beat-visual-studio-v15-original.
+          Исходный оригинал: https://method.hiveglobal.org/app/
+          Наша тестовая страница: https://wavedropstudio.ru/beat-visual-studio-v15-original/
+          Репозиторий: https://github.com/yangdozze/yangdozze.github.io
+
+          ## Что уже готово
+          1. Четыре больших JS-модуля METHOD (visual, dancer, readout, oscilloscope)
+             сравнили с оригиналом через Git blob SHA-1: совпадают байт-в-байт.
+          2. Главный полный method-shell-original.js (390 558 символов)
+             сверили с актуальным оригиналом: совпадает точно.
+          3. v15 использует исходный AudioEngine, систему экземпляров, рендер и
+             экспорт METHOD, вместо самодельных повторных адаптеров v10–v14.
+          4. Старая версия v9 с собственными STRIP/NIGHT сохранена в отдельной папке.
+          5. Изолированный тест 11 движков завершился без JS-исключений.
+          6. Быстрый детерминированный сравнительный тест: 11/11 базовых Looks
+             совпали на уровне пикселей (MAE=0 при тех же 22050 Hz PCM,
+             времени t=0.5 с, разрешении сравнения 270×480).
+          7. Полный тест подтвердил 58 кадров с MAE=0 на разных Looks и таймкодах.
+             Два оставшихся Looks Oscilloscope (blue, p7) НЕ ПРОВЕРЕНЫ:
+             лимит исполнения прервал тест после 15 минут.
+          8. Grid и Pads проверены отдельно после завершения асинхронного анализа:
+             сетки и волны появляются. MIDI/Score рисует ноты.
+
+          ## Как проводили сравнение
+          Один синтетический WAV/PCM (mono 22050 Hz) и одинаковые таймкоды
+          передавались исходным движкам в двух открытых страницах.
+          Сохраняли оригинальный canvas каждого движка из обоих сайтов,
+          сравнивали PNG поканально. Сторона A — METHOD, B — VISUALZI v15.
+          Сравнивались зафиксированные кадры; это НЕ тест реального
+          MP4-экспорта на обеих площадках и НЕ проверка одинаковой плавности
+          всего ролика на реальном iPhone.
+
+          ## Что надо делать дальше — точный порядок
+          1. Проверить оставшиеся два Looks Oscilloscope: blue и p7, отдельно
+             с увеличенным тайм-аутом и контролем памяти.
+          2. Проверить движение по 30 FPS в течение полноценного ролика:
+             те же PCM, параметры, таймкоды; дополнительно сравнить
+             окончательное видео после исходного compositor/post pipeline.
+          3. Проверить экспорт MP4 + звук, совпадение аудио-видео синхронизации
+             и seek/loop. Не путать статическую идентичность кадра с видео.
+          4. Протестировать Safari на физическом iPhone и выявить реальные
+             зависания от GPU/CPU. Десктопные замеры нельзя переносить на телефон.
+          5. Доделать удобную библиотеку Audio / MIDI в отдельной оболочке
+             только после окончания проверки, сохранив исходный METHOD renderer.
+          6. Не трогать v9, не изобретать свои стили METHOD и не выдавать
+             недоделанное сравнение за 100% проверенное.
+
+          ## Важные ошибки прежних версий
+          В v10–v14 был обрезан оригинальный главный скрипт и заменён собственной
+          обвязкой; дополнительно кадры копировались в второй canvas, плеер жил
+          отдельно от AudioEngine, а движки пересоздавались. Отсюда возможные
+          лаги и несходство. Базой дальше использовать v15-original.
+
+          ## Где лежат доказательства
+          GitHub Actions:
+          https://github.com/yangdozze/yangdozze.github.io/actions/runs/38945821618
+          https://github.com/yangdozze/yangdozze.github.io/actions/runs/38944930190
+          Оба теста сохранили PNG/JSON/MD; отметка failure у Actions была
+          вызвана тайм-аутом двух Looks в длинном тесте и отсутствием ffmpeg
+          при первоначальной попытке упаковать MP4.
+          Затем сравнения упаковали повторно:
+          https://github.com/yangdozze/yangdozze.github.io/actions/runs/38947257484
+
+          В папке QA_RESULTS (если присутствует) лежат собранные видео
+          сравнений и отчёты: 11 базовых стилей и 58 подтверждённых кадров.
+
+          ## Как передать проект новому чату
+          Напиши: «Прочитай НА_ЧЕМ_ОСТАНОВИЛИСЬ.md и README_RU.md из ZIP.
+          Продолжай VISUALZI с v15-original, не переписывай METHOD,
+          не ломай v9. Дотестируй два Looks Oscilloscope, затем видео,
+          экспорт, iPhone и только после этого делай Audio/MIDI UI».
+          STATUS
           cat > output/pack/VISUALZI_STUDIO/README_RU.md <<'DOC'
           # VISUALZI Beat Visual Studio — v15 original METHOD integration
           
