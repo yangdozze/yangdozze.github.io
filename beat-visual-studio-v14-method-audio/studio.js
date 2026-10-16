@@ -35,6 +35,8 @@ const classicSpecs=['strip','night'].map((id,i)=>({
  }
 }));
 const specs=M?.ENGINES||[];
+// Original METHOD instance model: create a visualizer once; reuse its canvas and analysis.
+const METHOD_INSTANCES=new Map(),METHOD_SETTINGS=new Map();
 const classifications={strip:['midi','audio'],night:['midi','audio'],midi:['midi'],retro:['audio'],caustic:['audio'],contour:['audio'],dust:['audio'],spatial:['audio'],volume:['audio'],dancer:['audio'],grid:['audio','midi'],pads:['audio','midi'],scope:['audio']};
 const engineNote={strip:'MIDI и звук',night:'MIDI и звук',midi:'Ноты из .mid',retro:'Глифы и линии',caustic:'Displaced / Thermal',contour:'Ткань и движение',dust:'Частицы',spatial:'Тяжёлая 3D-сцена',volume:'Тяжёлая 3D-сцена',dancer:'3D персонаж',grid:'Ритм / MIDI + звук',pads:'MPC / MIDI + звук',scope:'Осциллограф'};
 let activeFilter='audio',previewLastPaint=0,lastPaintPosition=-1,manualDraw=false,renderSlowWarning=false,previewBlocked=false,autoReductionMs=0;
@@ -47,12 +49,10 @@ function buildPeaks(pcm,blocks=1400){
  return result;
 }
 function releasePrevious(inst){
- const existing=$('stage').querySelector('.visualzi-native-preview');
- if(existing)existing.remove();
+ const canvas=$('stage').querySelector('.visualzi-native-preview');
+ if(canvas)canvas.remove();
  $('canvas').hidden=false;
- if(!inst)return;
- // METHOD renderer owns its WebGL context. Do not force-lose it on every switch.
- try{inst.dispose?.()}catch(e){console.warn(e)}
+ // METHOD keeps Inst[id] alive between visits. Do not rebuild or force-lose its GL context.
 }
 function attachNativePreview(inst){
  const c=inst?.canvas;
@@ -140,41 +140,53 @@ async function pickEngine(id,force=false){
  if(state.busy)return;
  stop();
  const E=specs.find(x=>x.id===id);if(!E)return;
- const priorParams=force&&state.id===id?{...state.params}:null;
- releasePrevious(state.instance);state.instance=null;state.id=id;window.App.vid=id;state.lastT=0;state.renderErr=null;previewBlocked=false;renderSlowWarning=false;autoReductionMs=0;state.mode=E.modes?.def||null;state.look=E.defaultLook||E.looks?.[0]?.k;
- state.params={};for(const p of E.params||[])state.params[p.k]=M.defOf(p,state.mode);
- if(priorParams)Object.assign(state.params,priorParams);
+ if(state.id)METHOD_SETTINGS.set(state.id,{mode:state.mode,look:state.look,params:{...state.params}});
+ const saved=METHOD_SETTINGS.get(id);
+ releasePrevious(state.instance);state.instance=null;
+ state.id=id;window.App.vid=id;state.lastT=0;state.renderErr=null;previewBlocked=false;renderSlowWarning=false;autoReductionMs=0;
+ state.mode=saved?saved.mode:E.modes?.def||null;
+ state.look=saved?saved.look:E.defaultLook||E.looks?.[0]?.k;
+ state.params=saved?{...saved.params}:{};
+ for(const p of E.params||[])if(!(p.k in state.params))state.params[p.k]=M.defOf(p,state.mode);
  $('engineStatus').textContent='Загрузка '+E.name;
- if(costOf(id)==='heavy'&&!force){
+ if(costOf(id)==='heavy'&&!force&&!METHOD_INSTANCES.has(id)){
   configureCanvas();controls();$('overlay').hidden=false;
-  $('overlay').textContent='Тяжёлый стиль. Нажми «Обновить кадр» для разовой отрисовки.';
+  $('overlay').textContent='Тяжёлый оригинальный движок METHOD. Нажми «Обновить кадр» для разовой отрисовки.';
   $('engineStatus').textContent=E.num+' / '+E.name;
-  say(E.name+': предпросмотр отключён до ручного запроса, чтобы не подвешивать сайт.');
-  setPerfNote('ТЯЖЁЛЫЙ ЭФФЕКТ · кадр по запросу');
-  for(const el of document.querySelectorAll('.engine'))el.classList.toggle('active',el.dataset.id===id);
-  return;
+  say(E.name+': создание GPU-сцены отложено до ручного запроса.');
+  setPerfNote('ТЯЖЁЛЫЙ METHOD · кадр по запросу');
+  library();return;
  }
  try{
-  const inst=E.create();state.instance=inst;markDirty();
-  configureCanvas();
-  attachNativePreview(inst);
+  let inst=METHOD_INSTANCES.get(id);
+  if(!inst){inst=E.create();METHOD_INSTANCES.set(id,inst);inst.__visualziAudioVer=-1;}
+  state.instance=inst;markDirty();configureCanvas();attachNativePreview(inst);
   if(inst.setMode&&state.mode)inst.setMode(state.mode);
   inst.setLook?.(state.look);
-  if(inst.set)for(const p of E.params||[])try{applyParam(p,state.params[p.k])}catch{}
-  if(state.pcm && id!=='midi') await setAudioOnEngine();
-  if(state.midiFile && inst.useMidiFile && (id==='midi'||id==='strip'||id==='night'||(state.pcm&&['grid','pads'].includes(id)))) await inst.useMidiFile(state.midiFile);
-  if(costOf(id)==='heavy')setPerfNote('3D · для защиты от зависаний включи кадр вручную');else setPerfNote('ЭКО · предпросмотр без лишней нагрузки');
-  controls();
-  $('overlay').hidden=true;
+  if(inst.set)for(const p of E.params||[])applyParam(p,state.params[p.k]);
+  // METHOD's own AudioEngine.ver determines when the audio really changed.
+  if(state.pcm&&id!=='midi')await setAudioOnEngine();
+  else if(!state.pcm&&inst.__visualziAudioVer!=='preview'){
+   const demo=M.makeDemoBeat();
+   inst.setAudio?.(demo.pcm,demo.sr);
+   inst.__visualziAudioVer='preview';
+  }
+  if(state.midiFile&&inst.useMidiFile&&(id==='midi'||(state.pcm&&['grid','pads'].includes(id))))await inst.useMidiFile(state.midiFile);
+  if(costOf(id)==='heavy')setPerfNote('Оригинальный METHOD · тяжёлый эффект, ручной кадр');
+  else setPerfNote('METHOD · оригинальный движок / один Canvas');
+  controls();$('overlay').hidden=true;
   $('engineStatus').textContent=E.num+' / '+E.name;
-  say('Движок '+E.name+' подключён. '+(state.pcm?'Аудио загружено.':'Добавь WAV/MP3 для реакции на звук.'));
- }catch(err){state.instance=null;$('overlay').hidden=false; $('overlay').textContent='Движок недоступен: '+(err.message||err);say(String(err?.stack||err).slice(0,160),true)}
- for(const el of document.querySelectorAll('.engine'))el.classList.toggle('active',el.dataset.id===id);markDirty();
+  say('METHOD '+E.name+': '+(state.pcm?'оригинальный аудиоплеер и PCM готовы.':'оригинальное демо/ожидание файла.'));
+ }catch(err){state.instance=null;$('overlay').hidden=false;$('overlay').textContent='Движок недоступен: '+(err.message||err);say(String(err.stack||err).slice(0,160),true)}
+ library();markDirty();
 }
 async function setAudioOnEngine(){
- if(!state.instance||!state.pcm||state.id==='midi')return;
- $('engineStatus').textContent='Анализ аудио…';
- try{await state.instance.setAudio(state.pcm,state.rate)}
+ const inst=state.instance;
+ if(!inst||!state.pcm||state.id==='midi')return;
+ // Mirrors METHOD original Inst[id]._ver vs AudioEngine.ver; no repeated analysis on style switches.
+ if(inst.__visualziAudioVer===M.audio.ver)return;
+ $('engineStatus').textContent='Анализ METHOD аудио…';
+ try{await inst.setAudio(state.pcm,state.rate);inst.__visualziAudioVer=M.audio.ver;}
  catch(e){say('Ошибка анализа: '+e.message,true)}
  $('engineStatus').textContent=selected()?.num+' / '+selected()?.name;
 }
