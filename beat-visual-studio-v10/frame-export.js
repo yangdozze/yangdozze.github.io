@@ -1,5 +1,5 @@
 /**
- * Deterministic offline video export for Beat Visual Studio v10.
+ * Deterministic offline video export for Beat Visual Studio v7.
  * Uses Mediabunny (MPL-2.0, https://mediabunny.dev) to mux WebCodecs frames.
  * Each rendered frame has an exact timestamp i/fps; render speed never changes video speed.
  * External library is loaded only when the user exports.
