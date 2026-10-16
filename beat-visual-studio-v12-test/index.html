@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="ru"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f7f7f5"><meta name="description" content="VISUALZI — аудио и MIDI визуализатор для вертикальных и широкоформатных видео.">
+<title>VISUALZI Studio — Audio / MIDI</title>
+<link rel="stylesheet" href="./style.css">
+</head><body>
+<header class="top"><div class="brand"><span class="brand-icon">V<span>.</span></span><div><div class="brand-name">VISUALZI <small>STUDIO</small></div><div class="brand-sub">YANGDOZZE / BEAT VISUAL STUDIO</div></div></div><nav class="top-links"><span class="build">V12 <b>TEST</b></span><a href="../beat-visual-studio-v9/">V9 CLASSIC ↗</a><a href="https://method.hiveglobal.org/app/#/caustic" target="_blank" rel="noopener noreferrer">METHOD ↗</a></nav></header>
+<main class="page">
+<section class="workspace">
+<div class="workspace-title"><div><div class="eyebrow">01 / LIVE COMPOSITION</div><h1>Твой бит.<br><em>Твой визуал.</em></h1></div><span class="status-pill" id="engineStatus">Загрузка</span></div>
+<div class="preview-panel">
+  <div class="preview-top"><span class="led"></span><span id="activeTag">LIVE PREVIEW / REAL AUDIO</span><span id="performanceMs">—</span></div>
+  <div class="stage-area"><div id="stage" class="stage" aria-label="Визуализация трека"><canvas id="canvas" width="540" height="960"></canvas><div id="overlay" class="overlay">Загрузи аудио или MIDI,<br>чтобы начать</div><button id="expand" class="expand" title="Полноэкранный просмотр" aria-label="Полный экран">⛶</button></div></div>
+  <div class="preview-footer"><span class="preview-caption">PREVIEW / NOT EXPORT</span><span id="previewAlert" class="preview-alert">ЭКО: меньше нагрузки на устройство</span></div>
+</div>
+<div class="transport"><button id="play" class="play-button" disabled aria-label="Воспроизвести">▶</button><button id="restart" class="icon-button" aria-label="В начало">↺</button><input id="seek" type="range" min="0" max="1000" value="0" aria-label="Позиция трека"><time id="clock">00:00 / 00:00</time></div>
+<div class="import-card">
+ <div class="eyebrow">02 / SOURCE FILES</div>
+ <div class="import-line"><label class="upload upload-primary" for="audio">＋ WAV / MP3 / M4A<input id="audio" type="file" accept="audio/*,.wav,.mp3,.m4a,.flac" hidden></label><label class="upload" for="midi">＋ MIDI .MID<input id="midi" type="file" accept=".mid,.midi,audio/midi,audio/x-midi" hidden></label><button id="demo" class="outline-button">Демо-бит</button></div>
+ <div id="fileName" class="filename">Аудио не загружено · файлы обрабатываются в браузере</div>
+ <div class="preview-choices"><label class="little-field">Производительность<select id="previewMode"><option value="eco" selected>Эко — автоматически</option><option value="balanced">Плавный — если тянет</option><option value="still">Стоп-кадр</option></select></label><button id="renderNow" class="render-button">Обновить кадр</button></div>
+ <div id="message" role="status" class="message">Выбери эффект и загрузи трек.</div>
+</div>
+</section>
+<aside class="tools">
+ <section class="panel library-panel">
+   <div class="panel-head"><div><div class="eyebrow">03 / ENGINE LIBRARY</div><h2>Стили</h2></div><span class="small-count" id="count">11 движков</span></div>
+   <div class="tabs" id="libraryTabs" role="group" aria-label="Категория визуализаторов"><button type="button" data-filter="audio" class="tab is-active" aria-pressed="true">Аудио</button><button type="button" data-filter="midi" class="tab" aria-pressed="false">MIDI</button><button type="button" data-filter="all" class="tab" aria-pressed="false">Все</button></div>
+   <p class="tab-description" id="categoryHint">Визуализации, которые реагируют на реальный звук.</p>
+   <div id="library" class="library"></div>
+   <p class="source-credit">Исходные визуальные движки: <a href="https://method.hiveglobal.org/app/" target="_blank" rel="noopener noreferrer">METHOD / HiveGlobal ↗</a>. STRIP / NIGHT: VISUALZI classic.</p>
+ </section>
+ <section class="panel settings-panel">
+   <div class="panel-head"><div><div class="eyebrow">04 / CUSTOMIZE</div><h2 id="settingTitle">Настройки эффекта</h2></div><span class="small-count">LIVE</span></div>
+   <div class="settings-row"><label class="control">Цветовая схема<select id="look"></select></label><label class="control" id="modeRow">Режим<select id="mode"></select></label></div>
+   <div class="settings-row"><label class="control">Формат<select id="aspect"><option value="9:16">9:16 · TikTok / Reels</option><option value="16:9">16:9 · YouTube</option></select></label><label class="control">FPS видео<select id="fps"><option value="24">24 FPS</option><option value="30" selected>30 FPS</option><option value="60">60 FPS</option></select></label></div>
+   <details class="native-params" open><summary>Параметры движка <span>＋</span></summary><div id="params" class="params"></div></details>
+ </section>
+ <section class="panel export-panel">
+  <div class="panel-head"><div><div class="eyebrow">05 / FINISH</div><h2>Экспорт видео</h2></div><span class="small-count">MP4 / WEBM</span></div>
+  <div class="settings-row"><label class="control">Яркость <output id="brightnessOut">100%</output><input id="brightness" type="range" min="60" max="160" value="100"></label><label class="control">Контраст <output id="contrastOut">100%</output><input id="contrast" type="range" min="60" max="160" value="100"></label></div>
+  <label class="control">Насыщенность <output id="saturationOut">100%</output><input id="saturation" type="range" min="0" max="200" value="100"></label>
+  <div class="settings-row"><label class="control">Длительность, секунд<input id="duration" type="number" min="1" max="180" value="10" inputmode="numeric"></label><label class="control">Качество<select id="resolution"><option value="540">540px · компактно</option><option value="720" selected>720px · стандарт</option><option value="1080">1080px · высокое</option></select></label></div>
+  <p class="export-help">Экспорт рендерит каждый кадр по таймкоду. Эко-режим предпросмотра не снижает качество файла.</p>
+  <button id="export" class="export-btn">Экспортировать видео ↗</button><progress id="progress" max="1" value="0" hidden></progress><div id="download" class="downloads"></div>
+ </section>
+</aside>
+</main>
+<footer><span>VISUALZI © 2026 · Beat Visual Studio by yangdozze</span><span>METHOD visual engines © their respective authors · Source attribution retained. No Audio-to-MIDI.</span></footer>
+<script>
+window.App={view:'ws',vid:'caustic',advTab:'vis',advOpen:false};
+window.parseTrackName=function(input){const clean=String(input||'').split(/[\\/]/).pop().replace(/\.[^.]+$/,'').trim();const parts=clean.split(/\s+-\s+/);return {title:parts.length>1?parts.slice(1).join(' - '):clean,artist:parts.length>1?parts[0]:''};};
+</script>
+<script src="../beat-visual-studio-v10/method-visual-engines.js"></script>
+<script src="../beat-visual-studio-v10/method-dancer.js"></script>
+<script src="../beat-visual-studio-v10/method-readout.js"></script>
+<script src="../beat-visual-studio-v10/method-oscilloscope.js"></script>
+<script src="../beat-visual-studio-v10/method-registry.js"></script>
+<script>window.METHOD_V10.audio=AudioEngine;</script>
+<script type="module" src="./studio.js"></script></body></html>
