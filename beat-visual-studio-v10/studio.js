@@ -1,207 +1,83 @@
-import {exportFrameAccurate} from './frame-export.js';
-const $=id=>document.getElementById(id), M=window.METHOD_V10;
-const state={id:null,instance:null,audioBuffer:null,pcm:null,rate:44100,source:null,clock:0,start:0,started:false,context:null,position:0,duration:0,lastT:0,mode:null,look:null,params:{},aspect:'9:16',busy:false,rendering:false};
-const specs=M?.ENGINES||[];
-const clamp=(x,a,b)=>Math.min(b,Math.max(a,x));
-const say=(msg,isError=false)=>{$('message').textContent=msg;$('message').style.color=isError?'#a33636':'#7a7381'};
-const labelTime=n=>{n=Math.max(0,n||0);return String(Math.floor(n/60)).padStart(2,'0')+':'+String(Math.floor(n%60)).padStart(2,'0')};
-const current=()=>state.started&&state.context?clamp(state.position+state.context.currentTime-state.start,0,state.duration):state.position;
-const selected=()=>specs.find(x=>x.id===state.id);
-function configureCanvas(){
- const land=state.aspect==='16:9',w=land?960:540,h=land?540:960;
- const c=$('canvas');c.width=w;c.height=h;
- $('stage').style.aspectRatio=land?'16/9':'9/16';
- if(state.instance?.setAspect)try{state.instance.setAspect(state.aspect)}catch(e){say('Формат: '+e.message,true)}
-}
-function applyParam(p,value){
- const inst=state.instance;if(!inst?.set)return;
- const v=typeof value==='number'?value:typeof p.min==='number'?Number(value):value;
- state.params[p.k]=v;
- try{inst.set(p.k,v)}catch(e){say(p.label+': '+e.message,true)}
-}
-function fillSelect(select,options,value){select.replaceChildren();for(const p of options){const o=document.createElement('option');o.value=p.v??p.k;o.textContent=p.label||p.name||o.value;select.append(o)}select.value=value}
-function controls(){
- const spec=selected();if(!spec)return;
- $('settingTitle').textContent=spec.name+' / '+(spec.num||'');
- fillSelect($('look'),spec.looks||[],state.look);
- const mode=spec.modes; $('modeRow').hidden=!mode;
- if(mode)fillSelect($('mode'),mode.options||[],state.mode);
- const host=$('params');host.replaceChildren();
- const groups=new Map();
- for(const p of spec.params||[]){
-  if(p.modes&&state.mode&&!p.modes.includes(state.mode)&&!p.modes.includes(state.look))continue;
-  const key=p.group||((p.tier===1||p.tier===2)?'Основные':'Дополнительно');
-  if(!groups.has(key))groups.set(key,[]);
-  groups.get(key).push(p);
- }
- for(const [name,ps] of groups){
-  const section=document.createElement('section');section.className='param-group';
-  const head=document.createElement('h3');head.textContent=name;section.append(head);
-  for(const p of ps){
-   const wrap=document.createElement('label');wrap.className='control';wrap.textContent=p.label||p.k;
-   const choices=p.choices||(p.options||null);
-   const def=state.params[p.k];
-   if(choices||typeof def==='string'){
-    const sel=document.createElement('select');
-    const opts=choices||[{v:def,label:def}];
-    fillSelect(sel,opts,def);sel.onchange=()=>applyParam(p,sel.value);wrap.append(sel);
-   }else if(typeof p.min==='number'&&typeof p.max==='number'){
-    const out=document.createElement('output');wrap.append(out);
-    const input=document.createElement('input');input.type='range';input.min=p.min;input.max=p.max;
-    input.step=p.int?'1':Math.max(.001,(p.max-p.min)/300);input.value=Number(def)||0;
-    const fmt=v=>{try{return p.fmt?p.fmt(Number(v)):Number(v).toFixed(p.int?0:2)}catch{return String(v)}};
-    out.textContent=fmt(input.value);
-    input.oninput=()=>{out.textContent=fmt(input.value);applyParam(p,Number(input.value))};wrap.append(input);
-   }else{const info=document.createElement('small');info.textContent=String(def??'');wrap.append(info)}
-   if(p.hint)wrap.title=p.hint;
-   section.append(wrap);
-  }
-  host.append(section);
- }
-}
-function stop(){
- if(state.source){try{state.source.stop()}catch{}state.source.disconnect();state.source=null}
- state.position=current();state.started=false;$('play').textContent='▶'
-}
-async function pickEngine(id){
- if(state.busy)return;
- stop();
- const E=specs.find(x=>x.id===id);if(!E)return;
- state.id=id;state.mode=E.modes?.def||null;state.look=E.defaultLook||E.looks?.[0]?.k;
- state.params={};for(const p of E.params||[])state.params[p.k]=M.defOf(p,state.mode);
- $('engineStatus').textContent='Загрузка '+E.name;
+/* Beat Visual Studio v10 host — no original METHOD account or payment code. */
+(()=>{
+'use strict';
+const $=id=>document.getElementById(id), ENG=window.METHOD_AUDIO_ENGINES||[];
+const state={engine:null,adapter:null,instance:null,params:{},mode:'',look:'',audio:null,pcm:null,audioContext:null,source:null,started:0,paused:0,playing:false,raf:0,lastDraw:-1,aspect:'9:16',rendering:false};
+const ctx=$('stage').getContext('2d',{alpha:false}),wave=$('wave'),wctx=wave.getContext('2d');
+function error(e){console.error('[Beat Visual Studio v10]',e);$('error').hidden=false;$('error').textContent=(e?.message||String(e));$('exportMsg').textContent='Ошибка: '+(e?.message||String(e));}
+function ready(){return !!(state.pcm&&state.instance)}
+function duration(){return state.audio?.duration||0}
+function now(){return state.playing?Math.min(duration(),state.paused+Math.max(0,state.audioContext.currentTime-state.started)):state.paused}
+function pause(){if(state.playing){state.paused=now();state.playing=false;state.source?.stop();state.source?.disconnect();state.source=null;}$('play').textContent='▶'}
+function format(t){return Math.floor(t/60)+':'+String(Math.floor(t%60)).padStart(2,'0')}
+async function play(){if(!ready())return;try{
+ if(!state.audioContext)state.audioContext=new(window.AudioContext||window.webkitAudioContext)();
+ await state.audioContext.resume();if(state.playing){pause();return}
+ if(state.paused>=duration()-.05)state.paused=0;
+ let src=state.audioContext.createBufferSource();src.buffer=state.audio;src.connect(state.audioContext.destination);
+ state.started=state.audioContext.currentTime;src.start(0,state.paused);state.playing=true;state.source=src;$('play').textContent='Ⅱ';
+ src.onended=()=>{if(state.source===src){state.paused=duration();state.source=null;state.playing=false;$('play').textContent='▶'}};
+}catch(e){error(e)}}
+function seek(t){const was=state.playing;if(was)pause();state.paused=Math.min(duration(),Math.max(0,t));state.lastDraw=-1;if(was)play()}
+function mono(a){if(a.numberOfChannels===1)return a.getChannelData(0);const v=new Float32Array(a.length);for(let ch=0;ch<a.numberOfChannels;ch++){const p=a.getChannelData(ch);for(let i=0;i<v.length;i++)v[i]+=p[i]/a.numberOfChannels}return v}
+function drawWave(){const r=wave.getBoundingClientRect(),W=wave.width=Math.max(1,Math.round(r.width)),H=wave.height=60;wctx.fillStyle='#ebe8ef';wctx.fillRect(0,0,W,H);
+ if(!state.pcm)return;wctx.fillStyle='#8c72ac';const arr=state.pcm;for(let x=0;x<W;x++){let a=Math.floor(x*arr.length/W),b=Math.min(arr.length,Math.floor((x+1)*arr.length/W)),mx=0;for(let j=a;j<b;j+=5)mx=Math.max(mx,Math.abs(arr[j]));let h=Math.max(1,Math.round(mx*H*.85));wctx.fillRect(x,Math.round((H-h)/2),1,h)}}
+function setStatus(){const t=now();$('clock').textContent=format(t)+' / '+format(duration());$('seek').max=duration()||1;$('seek').value=Math.min(duration(),t)}
+function configure(sel){const p=state.params;
+ for(const option of sel.params||[]){let value=option.def;if(value&&typeof value==='object')value=Object.values(value)[0];if(value===undefined)continue;p[option.k]=value;try{state.instance?.set(option.k,value)}catch(e){console.warn('Setting failed',option.k,e)}}}
+function initEngine(id){const engine=ENG.find(e=>e.id===id);if(!engine)return;pause();state.engine=id;state.adapter=engine;state.instance=null;state.params={};state.lastDraw=-1;$('error').hidden=true;
+ try{const inst=engine.create();state.instance=inst; if(inst.setAspect)inst.setAspect(state.aspect);configure(engine);state.look=engine.defaultLook||engine.looks?.[0]?.k||'';if(inst.setLook)inst.setLook(state.look);
+ state.mode=engine.modes?.def||'';if(inst.setMode&&state.mode)inst.setMode(state.mode);if(state.pcm)inst.setAudio(state.pcm,state.audio.sampleRate);
+ $('engineName').textContent=engine.name;$('engineTag').textContent=engine.tag+' · METHOD';$('lookName').textContent=engine.name.toUpperCase();$('empty').hidden=!!state.pcm;
+ $('play').disabled=!state.pcm;$('export').disabled=!state.pcm;
+ buildControls();buildStyles();drawOnce(now(),1/30,true);
+ }catch(e){error(e)}}
+function buildStyles(){const root=$('styles');root.replaceChildren();for(const e of ENG){const b=document.createElement('button');b.className='style'+(state.engine===e.id?' selected':'');b.type='button';b.setAttribute('aria-pressed',String(state.engine===e.id));
+ const l=e.looks?.find(v=>v.k===e.defaultLook)||e.looks?.[0]||{},sw=document.createElement('div');sw.className='swatch';sw.style.background=l.bg||'#000';sw.style.color=l.fg||'#fff';const mark=document.createElement('i');mark.style.background='currentColor';sw.append(mark);b.append(sw);
+ const name=document.createElement('b');name.textContent=e.name;b.append(name);const t=document.createElement('small');t.textContent=(e.looks?.length||1)+' looks · '+e.tag;b.append(t);
+ b.onclick=()=>initEngine(e.id);root.append(b)}$('styleCount').textContent=ENG.length+' ORIGINAL'}
+function makeSection(name,root){const h=document.createElement('h3');h.textContent=name;root.append(h)}
+function buildControls(){const eng=state.adapter,root=$('controls');root.replaceChildren();
+ if(!eng)return;
+ makeSection('Палитра / Look',root);const group=document.createElement('div');group.className='look-choices';
+ for(const l of eng.looks||[]){const b=document.createElement('button');b.type='button';b.className='choice'+(l.k===state.look?' sel':'');
+ const c=document.createElement('div');c.className='color';c.style.background='linear-gradient(135deg,'+(l.bg||'#000')+','+(l.g||l.fg||'#999')+')';b.append(c);
+ const n=document.createElement('span');n.textContent=l.label||l.k;b.append(n);b.onclick=()=>{state.look=l.k;state.instance.setLook(l.k);state.lastDraw=-1;buildControls()};group.append(b)}
+ root.append(group);
+ if(eng.modes?.options?.length){makeSection(eng.modes.label||'Mode',root);const wrap=document.createElement('div');wrap.className='control';
+ const select=document.createElement('select');for(const opt of eng.modes.options){const item=document.createElement('option');item.value=opt.v;item.textContent=opt.label;select.append(item)}select.value=state.mode;select.onchange=()=>{state.mode=select.value;state.instance.setMode?.(state.mode);state.lastDraw=-1};wrap.append(select);root.append(wrap)}
+ const grouped=new Map();for(const p of eng.params||[]){const group=p.group||'Основные параметры';if(!grouped.has(group))grouped.set(group,[]);grouped.get(group).push(p)}
+ for(const [group,parameters] of grouped){makeSection(group,root);for(const p of parameters){const box=document.createElement('div');box.className='control',hd=document.createElement('div');hd.className='head';
+ const title=document.createElement('span');title.textContent=p.label||p.k;const output=document.createElement('output');hd.append(title,output);
+ const input=document.createElement('input');input.type='range';input.min=p.min??0;input.max=p.max??1;input.step=p.int?'1':String((Number(input.max)-Number(input.min))/250);
+ input.value=state.params[p.k]??p.def??0;const renderValue=()=>{let v=+input.value;let txt;try{txt=p.fmt?p.fmt(v):p.int?String(Math.round(v)):v.toFixed(2)}catch{txt=v.toFixed(2)}output.textContent=txt};
+ renderValue();input.oninput=()=>{let v=+input.value;state.params[p.k]=v;try{state.instance.set(p.k,v);state.lastDraw=-1}catch(e){error(e)}renderValue()};box.append(hd,input);
+ if(p.hint){const small=document.createElement('small');small.textContent=p.hint;box.append(small)}root.append(box)}}}
+function drawOnce(t,dt,playing,output=ctx,canvas=$('stage')){if(!ready())return;try{
+ state.instance.frame(t,dt,playing);output.fillStyle='#060607';output.fillRect(0,0,canvas.width,canvas.height);output.drawImage(state.instance.canvas,0,0,canvas.width,canvas.height);
+ }catch(e){error(e);state.playing=false}}
+function tick(){state.raf=requestAnimationFrame(tick);setStatus();if(state.rendering||!ready())return;
+ const t=now();if(state.playing&&t>=duration()-.015){pause();state.paused=duration()}
+ if(state.lastDraw<0||Math.abs(t-state.lastDraw)>=1/28){const dt=state.lastDraw<0||t<state.lastDraw?1/30:Math.min(.09,t-state.lastDraw);drawOnce(t,dt,state.playing);state.lastDraw=t}}
+async function load(file){if(!file)return;pause();$('fileName').textContent='Декодирование: '+file.name;try{
+ let c=state.audioContext||new(window.AudioContext||window.webkitAudioContext)();state.audioContext=c;
+ const audio=await c.decodeAudioData(await file.arrayBuffer());state.audio=audio;state.pcm=mono(audio);state.paused=0;state.lastDraw=-1;
+ $('fileName').textContent=file.name+' · '+format(duration());$('duration').value=Math.min(12,Math.floor(duration()));drawWave();$('empty').hidden=true;
+ if(state.adapter){initEngine(state.engine)}else initEngine('retro');
+ }catch(e){error(e);$('fileName').textContent='Ошибка декодирования'}}
+async function exportVideo(){if(!ready()||state.rendering)return;pause();$('export').disabled=true;state.rendering=true;$('progress').hidden=false;$('progress').value=0;$('download').hidden=true;
+ let original=$('stage'),sw=original.width,sh=original.height,dur=Math.max(1,Math.min(duration(),Number($('duration').value)||12)),fps=Number($('fps').value)||30;
  try{
-  const inst=E.create();state.instance=inst;
-  configureCanvas();
-  if(inst.setMode&&state.mode)inst.setMode(state.mode);
-  inst.setLook?.(state.look);
-  if(inst.set)for(const p of E.params||[])try{applyParam(p,state.params[p.k])}catch{}
-  if(state.pcm) await setAudioOnEngine();
-  controls();
-  $('overlay').hidden=true;
-  $('engineStatus').textContent=E.num+' / '+E.name;
-  say('Движок '+E.name+' подключён. '+(state.pcm?'Аудио загружено.':'Добавь WAV/MP3 для реакции на звук.'));
- }catch(err){state.instance=null;$('overlay').hidden=false; $('overlay').textContent='Движок недоступен: '+(err.message||err);say(String(err?.stack||err).slice(0,160),true)}
- for(const el of document.querySelectorAll('.engine'))el.classList.toggle('active',el.dataset.id===id);
-}
-async function setAudioOnEngine(){
- if(!state.instance||!state.pcm)return;
- $('engineStatus').textContent='Анализ аудио…';
- try{await state.instance.setAudio(state.pcm,state.rate)}
- catch(e){say('Ошибка анализа: '+e.message,true)}
- $('engineStatus').textContent=selected()?.num+' / '+selected()?.name;
-}
-async function loadAudio(file){
- stop();state.busy=true;say('Декодирование '+file.name+'…');
- try{
-  const ctx=state.context||new (window.AudioContext||window.webkitAudioContext)();
-  state.context=ctx;const b=await ctx.decodeAudioData(await file.arrayBuffer());
-  state.audioBuffer=b;state.rate=b.sampleRate;state.duration=b.duration;state.position=0;
-  const mono=new Float32Array(b.length);
-  for(let ch=0;ch<b.numberOfChannels;ch++){const samples=b.getChannelData(ch);for(let i=0;i<mono.length;i++)mono[i]+=samples[i]/b.numberOfChannels}
-  state.pcm=mono;
-  $('fileName').textContent=file.name+' · '+labelTime(b.duration);$('play').disabled=false;
-  await setAudioOnEngine();say('Готово · '+file.name+' · '+b.sampleRate+' Гц');
- }catch(e){say('Ошибка файла: '+e.message,true)}
- finally{state.busy=false}
-}
-async function useDemo(){
- const d=M.makeDemoBeat(),ctx=state.context||new (window.AudioContext||window.webkitAudioContext)();state.context=ctx;
- const b=ctx.createBuffer(1,d.pcm.length,d.sr);b.copyToChannel(d.pcm,0);state.busy=true;
- try{stop();state.audioBuffer=b;state.pcm=d.pcm;state.rate=d.sr;state.duration=b.duration;state.position=0;
-  $('fileName').textContent='METHOD demo beat · '+labelTime(state.duration);$('play').disabled=false;
-  await setAudioOnEngine();say('Загружено демо-аудио METHOD (реальный PCM)')}
- finally{state.busy=false}
-}
-function drawAt(ctx,t,preview=true){
- const W=ctx.canvas.width,H=ctx.canvas.height;
- ctx.save();ctx.fillStyle='#08080a';ctx.fillRect(0,0,W,H);
- if(state.instance){
-  try{
-   const dt=state.lastT&&t>=state.lastT?clamp(t-state.lastT,1/240,.1):1/30;
-   state.instance.frame(t,dt,state.started||!preview);
-   const brightness=$('brightness').value,contrast=$('contrast').value,saturation=$('saturation').value;
-   ctx.filter='brightness('+brightness+'%) contrast('+contrast+'%) saturate('+saturation+'%)';
-   const c=state.instance.canvas;if(c?.width&&c?.height)ctx.drawImage(c,0,0,W,H);
-   ctx.filter='none';
-   if(preview)state.lastT=t;
-  }catch(e){if(!state.renderErr||state.renderErr!==String(e)){state.renderErr=String(e);say('Движок: '+e.message,true);console.error(e)}}
- }
- ctx.restore();
-}
-let frameNo=0;
-function loop(){
- requestAnimationFrame(loop);
- if(state.busy&&!state.rendering)return;
- if(state.rendering)return;
- if(++frameNo%2!==0)return; // preview limit ~30 FPS (live engines are CPU/GPU-heavy)
- const t=current();if(state.duration&&t>=state.duration&&state.started){stop();state.position=state.duration}
- drawAt($('canvas').getContext('2d',{alpha:false}),t);
- $('clock').textContent=labelTime(t)+' / '+labelTime(state.duration);
- $('seek').value=state.duration?Math.round(t/state.duration*1000):0;
-}
-$('look').onchange=()=>{state.look=$('look').value;try{state.instance?.setLook(state.look)}catch(e){say(e.message,true)}};
-$('mode').onchange=()=>{state.mode=$('mode').value;state.instance?.setMode?.(state.mode);controls()};
-$('aspect').onchange=()=>{state.aspect=$('aspect').value;configureCanvas()};
-$('audio').onchange=e=>{if(e.target.files?.[0])loadAudio(e.target.files[0])};
-$('midi').onchange=async e=>{
- const file=e.target.files?.[0];if(!file)return;
- if(!state.instance?.useMidiFile){say('Для настоящего MIDI выбери MIDI / Score, Grid или Pads. Отдельного Audio-to-MIDI нет.',true);return}
- try{
-  if(!state.pcm)await useDemo();
-  await state.instance.useMidiFile(file);
-  say('MIDI '+file.name+' передан движку '+selected().name);
- }catch(err){say('Ошибка MIDI: '+err.message,true)}
-};
-$('demo').onclick=()=>useDemo();
-$('play').onclick=async()=>{
- if(state.started){stop();return}
- if(!state.audioBuffer)return;
- const ctx=state.context;await ctx.resume();
- if(state.position>=state.duration-.02)state.position=0;
- const source=ctx.createBufferSource();source.buffer=state.audioBuffer;source.connect(ctx.destination);
- source.onended=()=>{if(source===state.source){state.source=null;state.position=state.duration;state.started=false;$('play').textContent='▶'}};
- source.start(0,state.position);state.source=source;state.start=ctx.currentTime;state.started=true;$('play').textContent='Ⅱ';
-};
-$('restart').onclick=()=>{stop();state.position=0;state.lastT=0};
-$('seek').oninput=()=>{let next=state.duration*Number($('seek').value)/1000;stop();state.position=next;state.lastT=0};
-$('expand').onclick=async()=>{
- const el=$('stage');
- if(document.fullscreenElement){await document.exitFullscreen();return}
- if(el.classList.contains('immersive')){el.classList.remove('immersive');return}
- try{if(el.requestFullscreen)await el.requestFullscreen();else el.classList.add('immersive')}catch{el.classList.add('immersive')}
-};
-for(const id of ['brightness','contrast','saturation'])$(id).oninput=()=>$(id+'Out').textContent=$(id).value+'%';
-$('export').onclick=async()=>{
- if(state.busy||!state.audioBuffer||!state.instance){say('Сначала загрузи WAV/MP3 и выбери стиль.',true);return}
- const dur=clamp(Number($('duration').value)||10,1,180);
- const fps=Number($('fps').value),res=Number($('resolution').value);
- const land=state.aspect==='16:9',width=land?Math.round(res*16/9):res,height=land?res:Math.round(res*16/9);
- const was=current();stop();state.busy=true;state.rendering=true;$('export').disabled=true;
- $('progress').hidden=false;$('progress').value=0;
- try{
-  const out=await exportFrameAccurate({audioBuffer:state.audioBuffer,canvasWidth:width,canvasHeight:height,fps,start:0,
-   duration:Math.min(dur,state.duration),loopAudio:false,volume:1,cancelled:()=>false,
-   progress:x=>{$('progress').value=x;say('Экспорт '+Math.round(x*100)+'%')},
-   renderAt:(ctx,t)=>drawAt(ctx,t,false)});
-  const href=URL.createObjectURL(out.blob);
-  const a=document.createElement('a');a.href=href;a.download='bvs_method_'+state.id+'.'+out.ext;
-  a.textContent='Скачать '+out.ext.toUpperCase()+' · '+out.frames+' кадров';$('download').replaceChildren(a);a.click();
-  say('Готово: '+out.frames+' кадров. Экспорт покадровый.');
- }catch(e){console.error(e);say('Не удалось экспортировать: '+e.message,true)}
- finally{state.rendering=false;state.busy=false;$('export').disabled=false;$('progress').hidden=true;state.lastT=0;state.position=was}
-};
-function library(){
- $('library').replaceChildren();
- for(const E of specs){
-  const b=document.createElement('button');b.className='engine';b.dataset.id=E.id;
-  const sw=document.createElement('span');sw.className='swatch';sw.style.background='linear-gradient(110deg,'+(E.looks?.[0]?.bg||'#08090e')+','+(E.looks?.[0]?.fg||'#adb6ca')+')';
-  const label=document.createElement('strong');label.textContent=(E.num||'')+' '+E.name;
-  const meta=document.createElement('small');meta.textContent=E.looks?.length+' looks · '+(E.params?.length||0)+' controls';
-  b.append(sw,label,meta);b.onclick=()=>pickEngine(E.id);$('library').append(b);
- }
- $('count').textContent=specs.length+' семейств';
-}
-library();
-say(specs.length?'Движки METHOD загружены. Выбери семейство и WAV/MP3.':'Движки METHOD не загрузились.',!specs.length);
-pickEngine('caustic');requestAnimationFrame(loop);
+ const {exportFrameAccurate}=await import('./frame-export.js');
+ const result=await exportFrameAccurate({audioBuffer:state.audio,canvasWidth:sw,canvasHeight:sh,fps,start:0,duration:dur,loopAudio:false,volume:1,cancelled:()=>false,
+ progress:p=>{$('progress').value=p;$('exportMsg').textContent='Экспорт: '+Math.round(100*p)+'%'},renderAt:(target,t)=>{drawOnce(t,1/fps,true,target,original)}});
+ const url=URL.createObjectURL(result.blob);const link=$('download');link.href=url;link.download='BVS_METHOD_'+(state.adapter?.id||'style')+'.'+result.ext;
+ link.textContent='Скачать '+result.ext.toUpperCase()+' · '+result.frames+' кадров';link.hidden=false;link.click();$('exportMsg').textContent='Видео готово · '+(result.blob.size/1048576).toFixed(1)+' МБ';
+ }catch(e){error(e)}finally{$('export').disabled=false;state.rendering=false;$('progress').hidden=true;state.lastDraw=-1}}
+function resize(){const land=state.aspect==='16:9';$('stage').width=land?960:540;$('stage').height=land?540:960;document.querySelector('.screen').style.aspectRatio=land?'16/9':'9/16';
+ if(state.instance?.setAspect)state.instance.setAspect(state.aspect);state.lastDraw=-1}
+$('audio').addEventListener('change',e=>load(e.target.files?.[0]));$('play').onclick=play;
+$('seek').oninput=e=>seek(+e.target.value);$('aspect').onchange=e=>{state.aspect=e.target.value;resize()};$('export').onclick=exportVideo;
+wave.onclick=e=>{if(state.audio){let r=wave.getBoundingClientRect();seek(((e.clientX-r.left)/r.width)*duration())}};
+addEventListener('resize',drawWave);buildStyles();resize();initEngine('retro');tick();
+})();
