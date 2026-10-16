@@ -47,8 +47,9 @@ function demoAudio(){
 }
 demo=demoAudio();
 function stop(reset=false){
+ const heard=playing?timeNow():offset;
  if(source){try{source.stop();}catch{}source.disconnect();source=null;}
- if(playing){offset=displayTime();playing=false;}
+ if(playing){offset=Math.min(bufferDuration(),heard);playing=false;}
  if(reset)offset=0;
  $('play').textContent='▶';
 }
