@@ -200,7 +200,7 @@ function loop(wallTime){
  if(document.hidden||state.busy||state.rendering||!state.instance||(!hasMedia&&!manualDraw))return;
  const cost=costOf(state.id),mode=$('previewMode').value;
  if(cost==='heavy'&&!manualDraw)return; // Never auto-render known slow engines, even on Balanced.
- if((mode==='still'||(cost==='heavy'&&mode==='eco')||previewBlocked)&&!manualDraw)return;
+ if((mode==='still'||cost==='heavy'||previewBlocked)&&!manualDraw)return;
  const nativeDirty=!!state.instance._dirty;
  if(!state.started&&!manualDraw&&!nativeDirty&&lastPaintPosition===t)return;
  const baseRate=mode==='balanced'?{light:30,medium:12,heavy:1}:{light:20,medium:5,heavy:0.25};
