@@ -1,0 +1,16 @@
+<!doctype html><html lang="ru"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Beat Visual Studio v10 · Native METHOD audio QA</title><style>
+*{box-sizing:border-box}body{margin:0;padding:18px;background:#17181e;color:#f5f5f5;font:14px system-ui}h1{font-size:21px}button{font:inherit;min-height:48px;background:#c4b9ff;color:#141018;padding:10px 18px;border:0;border-radius:10px;font-weight:700}pre{white-space:pre-wrap;line-height:1.5;font-size:12px} .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:10px;margin-top:16px}.grid article{background:#292a33;padding:8px;border-radius:10px}.grid canvas{width:100%;height:auto;aspect-ratio:9/16;background:#000}.grid p{margin:5px;font-size:12px}
+</style>
+<h1>METHOD · v10 аудиотест</h1><p>Синтетический 2-секундный PCM с ударом баса и высокими частотами. Настоящие движки Retro, Contour, Dust, Spatial, Volume — без имитации рендера.</p>
+<button id="run">Проверить пять движков</button><pre id="report">Пока не проверено</pre><div id="grid" class="grid"></div>
+<script defer src="./method-native-engines.js"></script>
+<script defer src="./method-native-adapters.js"></script>
+<script type="module">
+import {renderMethod,nativeMethodRegistry,METHOD_FAMILIES} from './native-method.js';
+const btn=document.querySelector('#run'),report=document.querySelector('#report'),grid=document.querySelector('#grid'),write=(s)=>report.textContent+=s+'\n';
+function hash(c){const ctx=c.getContext('2d',{willReadFrequently:true}),d=ctx.getImageData(0,0,c.width,c.height).data;let h=2166136261,bright=0;for(let i=0;i<d.length;i+=100){h=Math.imul(h^d[i],16777619);bright+=d[i]+d[i+1]+d[i+2]>140?1:0;}return {h:(h>>>0).toString(16),bright};}
+function make(){const rate=44100,N=rate*2,b=new AudioBuffer({length:N,numberOfChannels:1,sampleRate:rate}),a=b.getChannelData(0);for(let i=0;i<N;i++){const t=i/rate,k=t%.5;const sub=Math.sin(Math.PI*2*75*t)*Math.exp(-k*17)*.78;const hat=Math.sin(i*27)*Math.exp(-(t%.125)*120)*.09;a[i]=Math.tanh(sub+hat+Math.sin(Math.PI*2*380*t)*.11);}return b;}
+btn.onclick=async()=>{btn.disabled=true;report.textContent='';grid.replaceChildren();const b=make(),data={decodedAudio:b,audioLoop:false};const checks=[];for(const style of METHOD_FAMILIES){const info=nativeMethodRegistry()[style],card=document.createElement('article'),title=document.createElement('p'),canvas=document.createElement('canvas');canvas.width=360;canvas.height=640;title.textContent=style+' · '+(info?.looks?.length||0)+' schemes';card.append(title,canvas);grid.append(card);const frames=[];const errors=[];for(const t of [.25,.55,1.05]){try{const start=performance.now();renderMethod(canvas.getContext('2d',{alpha:false,willReadFrequently:true}),360,640,t,{mode:style,methodLook:info?.defaultLook,methodVariant:info?.modes?.def,methodParams:{},exportMode:false},data,false);const val=hash(canvas);frames.push({t,ms:Math.round(performance.now()-start),...val});}catch(e){errors.push(String(e))}await new Promise(r=>setTimeout(r,0));}const status={style,frames,uniqueFrames:new Set(frames.map(x=>x.h)).size,errors};checks.push(status);write(JSON.stringify(status));}
+window.__BVS_NATIVE_QA_RESULT__=checks;btn.disabled=false;};
+</script>
