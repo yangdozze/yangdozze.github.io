@@ -62,9 +62,9 @@ function configureCanvas(){
  if(state.instance?.setAspect)try{state.instance.setAspect(state.aspect)}catch(e){say('Формат: '+e.message,true)}
 }
 function applyParam(p,value){
- const inst=state.instance;if(!inst?.set)return;
+ const inst=state.instance;
  const v=typeof value==='number'?value:typeof p.min==='number'?Number(value):value;
- state.params[p.k]=v;
+ state.params[p.k]=v;if(!inst?.set){markDirty();return;}
  try{inst.set(p.k,v);markDirty()}catch(e){say(p.label+': '+e.message,true)}
 }
 function fillSelect(select,options,value){select.replaceChildren();for(const p of options){const o=document.createElement('option');o.value=p.v??p.k;o.textContent=p.label||p.name||o.value;select.append(o)}select.value=value}
@@ -111,13 +111,24 @@ function stop(){
  if(state.source){try{state.source.stop()}catch{}state.source.disconnect();state.source=null}
  state.position=current();state.started=false;$('play').textContent='▶'
 }
-async function pickEngine(id){
+async function pickEngine(id,force=false){
  if(state.busy)return;
  stop();
  const E=specs.find(x=>x.id===id);if(!E)return;
+ const priorParams=force&&state.id===id?{...state.params}:null;
  releasePrevious(state.instance);state.instance=null;state.id=id;window.App.vid=id;state.lastT=0;state.renderErr=null;previewBlocked=false;renderSlowWarning=false;autoReductionMs=0;state.mode=E.modes?.def||null;state.look=E.defaultLook||E.looks?.[0]?.k;
  state.params={};for(const p of E.params||[])state.params[p.k]=M.defOf(p,state.mode);
+ if(priorParams)Object.assign(state.params,priorParams);
  $('engineStatus').textContent='Загрузка '+E.name;
+ if(costOf(id)==='heavy'&&!force){
+  configureCanvas();controls();$('overlay').hidden=false;
+  $('overlay').textContent='Тяжёлый 3D-движок. Нажми «Обновить кадр», чтобы включить рендер.';
+  $('engineStatus').textContent=E.num+' / '+E.name;
+  say(E.name+': загрузка 3D остановлена до ручного запроса. Это защищает страницу от зависания.');
+  setPerfNote('ТЯЖЁЛЫЙ 3D · включается вручную');
+  for(const el of document.querySelectorAll('.engine'))el.classList.toggle('active',el.dataset.id===id);
+  return;
+ }
  try{
   const inst=E.create();state.instance=inst;markDirty();
   configureCanvas();
@@ -205,7 +216,13 @@ function loop(wallTime){
   else setPerfNote('Автоснижение FPS: кадр '+Math.round(elapsed)+' мс');
  }else if(!previewBlocked){autoReductionMs=Math.max(0,autoReductionMs*.8);setPerfNote('ЭКО · кадр '+Math.round(elapsed)+' мс');}
 }
-$('renderNow').onclick=()=>{if(!state.instance){say('Сначала выбери движок.',true);return;}manualDraw=true;previewBlocked=false;previewLastPaint=0;markDirty();};
+$('renderNow').onclick=async()=>{
+ if(!state.instance&&state.id&&costOf(state.id)==='heavy'){
+  say('Загрузка 3D-движка · может занять несколько секунд…');await pickEngine(state.id,true);
+ }
+ if(!state.instance){say('Сначала выбери движок и загрузи аудио.',true);return;}
+ manualDraw=true;previewBlocked=false;previewLastPaint=0;markDirty();
+};
 $('previewMode').onchange=()=>{previewBlocked=false;autoReductionMs=0;markDirty();if(costOf(state.id)==='heavy')setPerfNote('3D-движок · один кадр может занимать несколько секунд');};
 $('look').onchange=()=>{state.look=$('look').value;try{state.instance?.setLook(state.look);markDirty()}catch(e){say(e.message,true)}};
 $('mode').onchange=()=>{state.mode=$('mode').value;state.instance?.setMode?.(state.mode);controls();markDirty()};
@@ -244,6 +261,7 @@ $('expand').onclick=async()=>{
 };
 for(const id of ['brightness','contrast','saturation'])$(id).oninput=()=>{$(id+'Out').textContent=$(id).value+'%';markDirty()};
 $('export').onclick=async()=>{
+ if(!state.instance&&state.audioBuffer&&costOf(state.id)==='heavy'){await pickEngine(state.id,true);}
  if(state.busy||!state.audioBuffer||!state.instance){say('Для экспорта нужен WAV/MP3. MIDI без аудио можно просматривать, но звук не синтезируется.',true);return}
  const dur=clamp(Number($('duration').value)||10,1,180);
  const fps=Number($('fps').value),res=Number($('resolution').value);
