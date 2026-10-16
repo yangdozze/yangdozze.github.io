@@ -1,0 +1,25 @@
+<!doctype html><html lang="ru"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>METHOD Engines — 11 Family Diagnostic</title><style>body{background:#151515;color:#eee;font:14px sans-serif;max-width:850px;margin:25px auto;padding:16px}pre{white-space:pre-wrap;line-height:1.6;background:#27272a;padding:18px;border-radius:12px}button{padding:12px}canvas{max-height:400px;max-width:300px}</style><h2>METHOD / 11 engines — isolated source test</h2><button id="test">Проверить 11 движков</button><pre id="report">Загрузка скриптов…</pre><canvas id="scene" width="360" height="640"></canvas><script src="./method-engines-visual.js"></script><script src="./method-engine-dancer.js"></script><script src="./method-engine-readout.js"></script><script src="./method-engine-osc.js"></script><script src="./method-adapters.js"></script><script>
+const report=document.querySelector('#report');
+let errors=[];window.addEventListener('error',e=>{errors.push(e.message);report.textContent='ERROR: '+e.message+'\n'+errors.join('\n')});
+function summary(){return {registry:Array.isArray(window.METHOD_ADAPTERS)?window.METHOD_ADAPTERS.map(x=>({id:x.id,name:x.name,looks:x.looks.length,parameters:x.params.length})):null,errors};}
+report.textContent=JSON.stringify(summary(),null,2);
+document.querySelector('#test').onclick=async()=>{
+const sr=22050,N=sr*2,pcm=new Float32Array(N);
+for(let i=0;i<N;i++){const t=i/sr,k=t%0.5;pcm[i]=Math.sin(2*Math.PI*70*t)*Math.exp(-k*18)*0.5+Math.sin(2*Math.PI*440*t)*0.11;}
+const results=[];
+for(const e of window.METHOD_ADAPTERS||[]){
+  let obj=null;
+  try{
+   const start=performance.now();obj=e.create();
+   if(obj.setAspect)obj.setAspect('9:16');
+   if(obj.setAudio)obj.setAudio(pcm,sr);
+   if(obj.setLook)obj.setLook(e.defaultLook);
+   if(obj.setMode&&e.modes)obj.setMode(e.modes.def);
+   obj.frame(0.4,1/30,false);
+   const source=obj.canvas,ctx=document.querySelector('#scene').getContext('2d');ctx.drawImage(source,0,0,360,640);
+   results.push({id:e.id,status:'OK',createdMs:Math.round(performance.now()-start),native:[source.width,source.height]});
+  }catch(ex){results.push({id:e.id,status:'ERROR',error:String(ex?.stack||ex).slice(0,500)})}
+}
+report.textContent=JSON.stringify({results,summary:summary()},null,2);
+};
+</script></html>
