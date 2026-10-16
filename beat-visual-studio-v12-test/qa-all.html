@@ -1,0 +1,50 @@
+<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VISUALZI / Native engine matrix QA</title><style>
+body{font:13px system-ui;background:#f8f8f6;color:#25232c;max-width:960px;margin:auto;padding:20px}h1{font-size:24px}
+button{padding:13px;border:0;border-radius:8px;background:#282431;color:white;cursor:pointer;min-height:44px}table{width:100%;border-collapse:collapse;background:white}th,td{padding:10px;text-align:left;border-bottom:1px solid #e4e2e7;font-variant-numeric:tabular-nums}th{background:#eceafd}pre{white-space:pre-wrap;font:11px monospace}
+</style></head><body>
+<h1>VISUALZI Native METHOD / QA matrix</h1><p>One native frame at t=0.5 s and second at t=0.9 s from the same 44.1 kHz PCM. Tests actual engine adapters, errors and frame duration. Expensive engines can stall this diagnostic. This is not FPS or cross-site pixel identity proof.</p>
+<button id="run">Run all 11 native engines</button><p id="status">Awaiting test</p><table><thead><tr><th>Engine</th><th>Frames</th><th>1st ms</th><th>2nd ms</th><th>Status</th></tr></thead><tbody id="results"></tbody></table>
+<pre id="json"></pre>
+<script>window.App={view:'ws',vid:'caustic',advTab:'vis',advOpen:false};
+window.parseTrackName=function(input){const clean=String(input||'').split(/[\\/]/).pop().replace(/\.[^.]+$/,'').trim();const parts=clean.split(/\s+-\s+/);return {title:parts.length>1?parts.slice(1).join(' - '):clean,artist:parts.length>1?parts[0]:''};};
+</script>
+<script src="../beat-visual-studio-v10/method-visual-engines.js"></script>
+<script src="../beat-visual-studio-v10/method-dancer.js"></script>
+<script src="../beat-visual-studio-v10/method-readout.js"></script>
+<script src="../beat-visual-studio-v10/method-oscilloscope.js"></script>
+<script src="../beat-visual-studio-v10/method-registry.js"></script>
+<script>
+window.METHOD_V10.audio=AudioEngine;
+const $=id=>document.getElementById(id),report=[];
+function signal(){const sr=44100,n=sr*2,p=new Float32Array(n);for(let i=0;i<n;i++){const t=i/sr,beat=t%.5;const kick=Math.sin(2*Math.PI*65*t)*Math.exp(-beat*28);p[i]=Math.tanh(.8*kick+.15*Math.sin(2*Math.PI*220*t)+.08*Math.sin(2*Math.PI*3600*t));}return{pcm:p,sr};}
+function digest(c){const ctx=c.getContext('2d');if(ctx){const data=ctx.getImageData(0,0,Math.min(32,c.width),Math.min(32,c.height)).data;let sum=0,col=0;for(let i=0;i<data.length;i+=4){const v=data[i]+data[i+1]+data[i+2];sum=(Math.imul(sum,33)+v)>>>0;if(v>18)col++;}return sum.toString(16)+':'+col;}return 'gpu/not-readback';}
+async function run(){
+ const b=$('run');b.disabled=true;const s=signal();const list=METHOD_V10.ENGINES;report.length=0;
+ const C=window.AudioContext||window.webkitAudioContext;const context=new C(),buf=context.createBuffer(1,s.pcm.length,s.sr);buf.copyToChannel(s.pcm,0);
+ AudioEngine._set(s.pcm,s.sr,buf,'QA synthetic beat',true);
+ for(const [i,E]of list.entries()){
+  $('status').textContent='Engine '+(i+1)+'/'+list.length+': '+E.name;
+  const row=document.createElement('tr');row.innerHTML='<td>'+E.name+'</td><td>…</td><td>…</td><td>…</td><td>running</td>';$('results').append(row);
+  let inst=null,record={id:E.id,name:E.name,source:'method-original',firstMs:null,secondMs:null,pixels:null,error:null};
+  try{
+    App.vid=E.id;inst=E.create();inst.setAspect?.('9:16');inst.setMode?.(E.modes?.def||'');inst.setLook?.(E.defaultLook||E.looks?.[0]?.k);
+    // The dedicated MIDI score is intentionally SMF-only in VISUALZI; do not invoke the original audio transcriber.
+    if(E.id!=='midi'){await inst.setAudio?.(s.pcm,s.sr);}
+    await new Promise(r=>setTimeout(r,25));
+    const start=performance.now();inst.frame(.5,1/30,true);record.firstMs=Math.round(performance.now()-start);
+    const a=digest(inst.canvas);
+    const next=performance.now();inst.frame(.9,1/30,true);record.secondMs=Math.round(performance.now()-next);
+    const z=digest(inst.canvas);record.pixels=a+' / '+z;
+  }catch(e){record.error=String(e?.stack||e).slice(0,400);}
+  report.push(record);row.cells[1].textContent=record.pixels||'-';row.cells[2].textContent=record.firstMs??'-';row.cells[3].textContent=record.secondMs??'-';row.cells[4].textContent=record.error?'ERROR: '+record.error.slice(0,60):'no exception';
+  $('json').textContent=JSON.stringify(report,null,2);
+  try{const gl=inst?.canvas?.getContext('webgl2');gl?.getExtension('WEBGL_lose_context')?.loseContext()}catch(e){}
+  inst=null;
+  await new Promise(r=>setTimeout(r,60));
+ }
+ $('status').textContent='Completed: '+report.length+' native engines; exceptions: '+report.filter(x=>x.error).length;b.disabled=false;
+}
+$('run').onclick=run;
+if(location.search.includes('autorun=1'))setTimeout(run,500);
+</script></body></html>
