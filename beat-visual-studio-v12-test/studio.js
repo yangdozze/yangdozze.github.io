@@ -4,7 +4,7 @@ import {render as renderClassic} from '../beat-visual-studio-v9/render.js';
 const $=id=>document.getElementById(id), M=window.METHOD_V10;
 const state={id:null,instance:null,audioBuffer:null,pcm:null,rate:44100,source:null,clock:0,start:0,started:false,context:null,position:0,duration:0,lastT:0,mode:null,look:null,params:{},aspect:'9:16',busy:false,rendering:false,midiFile:null,midiMeta:null,peaks:null,renderErr:null};
 // Existing VISUALZI v9 scenes stay available next to original METHOD adapters.
-const costOf=id=>['spatial','volume'].includes(id)?'heavy':['contour','dust','dancer','scope'].includes(id)?'medium':'light';
+const costOf=id=>['contour','dust','spatial','volume','scope'].includes(id)?'heavy':id==='dancer'?'medium':'light';
 const classicPresets={
  strip:{background:'#faf9f4',accent:'#8051bc',ink:'#342b3c'},
  night:{background:'#0d0d13',accent:'#b987f0',ink:'#f0e1ff'}
@@ -122,10 +122,10 @@ async function pickEngine(id,force=false){
  $('engineStatus').textContent='Загрузка '+E.name;
  if(costOf(id)==='heavy'&&!force){
   configureCanvas();controls();$('overlay').hidden=false;
-  $('overlay').textContent='Тяжёлый 3D-движок. Нажми «Обновить кадр», чтобы включить рендер.';
+  $('overlay').textContent='Тяжёлый стиль. Нажми «Обновить кадр» для разовой отрисовки.';
   $('engineStatus').textContent=E.num+' / '+E.name;
-  say(E.name+': загрузка 3D остановлена до ручного запроса. Это защищает страницу от зависания.');
-  setPerfNote('ТЯЖЁЛЫЙ 3D · включается вручную');
+  say(E.name+': предпросмотр отключён до ручного запроса, чтобы не подвешивать сайт.');
+  setPerfNote('ТЯЖЁЛЫЙ ЭФФЕКТ · кадр по запросу');
   for(const el of document.querySelectorAll('.engine'))el.classList.toggle('active',el.dataset.id===id);
   return;
  }
@@ -197,8 +197,9 @@ function loop(wallTime){
  if(state.duration&&t>=state.duration&&state.started){stop();state.position=state.duration;}
  $('clock').textContent=labelTime(t)+' / '+labelTime(state.duration);
  $('seek').value=state.duration?Math.round(t/state.duration*1000):0;
- if(document.hidden||state.busy||state.rendering||!state.instance||!hasMedia)return;
+ if(document.hidden||state.busy||state.rendering||!state.instance||(!hasMedia&&!manualDraw))return;
  const cost=costOf(state.id),mode=$('previewMode').value;
+ if(cost==='heavy'&&!manualDraw)return; // Never auto-render known slow engines, even on Balanced.
  if((mode==='still'||(cost==='heavy'&&mode==='eco')||previewBlocked)&&!manualDraw)return;
  const nativeDirty=!!state.instance._dirty;
  if(!state.started&&!manualDraw&&!nativeDirty&&lastPaintPosition===t)return;
@@ -290,7 +291,7 @@ function library(){
   const label=document.createElement('strong');label.textContent=(E.num||'')+' '+E.name;
   const meta=document.createElement('small');meta.textContent=engineNote[E.id]||((E.looks?.length||0)+' looks');
   copy.append(label,meta);
-  if(costOf(E.id)==='heavy'){const hint=document.createElement('span');hint.className='cost';hint.textContent='3D · ТЯЖЁЛЫЙ';copy.append(hint)}
+  if(costOf(E.id)==='heavy'){const hint=document.createElement('span');hint.className='cost';hint.textContent='ТЯЖЁЛЫЙ · ВРУЧНУЮ';copy.append(hint)}
   b.append(sw,copy);b.onclick=()=>pickEngine(E.id);b.classList.toggle('active',E.id===state.id);host.append(b);
  }
  $('count').textContent=visible.length+' / '+specs.length;
