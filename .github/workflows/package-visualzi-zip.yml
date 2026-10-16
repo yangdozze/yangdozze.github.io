@@ -1,0 +1,85 @@
+name: Build VISUALZI Studio ZIP
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/package-visualzi-zip.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create standalone source package
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p output/pack/VISUALZI_STUDIO
+          cp -a beat-visual-studio-v15-original output/pack/VISUALZI_STUDIO/
+          cp -a beat-visual-studio-v10 output/pack/VISUALZI_STUDIO/
+          cp -a beat-visual-studio-v9 output/pack/VISUALZI_STUDIO/
+          cp -a beat-visual-studio-v14-method-audio/METHOD_PARITY_QA.md output/pack/VISUALZI_STUDIO/METHOD_PARITY_QA.md
+          cat > output/pack/VISUALZI_STUDIO/README_RU.md <<'DOC'
+          # VISUALZI Beat Visual Studio — v15 original METHOD integration
+          
+          ## Содержимое
+          - beat-visual-studio-v15-original/ — текущая сборка с полным оригинальным JS METHOD.
+          - beat-visual-studio-v10/ — исходные модули визуальных движков, на которые ссылается v15.
+          - beat-visual-studio-v9/ — сохранённая рабочая v9 (в том числе STRIP/NIGHT).
+          - METHOD_PARITY_QA.md — проверенные показатели, ограничения и список незавершённых тестов.
+          
+          ## Запуск
+          Распакуй ZIP целиком, НЕ меняя имена папок: относительные импорты v15 ведут к v10.
+          Нужен локальный HTTP-сервер (или публикация на любом статическом хостинге):
+          
+          ```
+          python -m http.server 8000
+          ```
+          
+          Затем открой:
+          http://localhost:8000/beat-visual-studio-v15-original/
+          
+          Рабочая старая версия:
+          http://localhost:8000/beat-visual-studio-v9/
+          
+          Открытие index.html напрямую через file:// может нарушить работу модулей/функций браузера.
+          Важное ограничение: METHOD имеет зависимости от внешних шрифтов и сервисов авторизации/лицензии.
+          ZIP содержит код из репозитория, но не гарантирует полностью автономную работу без сети.
+          Оригинальные лицензии и указания авторства сохраняются.
+          
+          Проверка кадров: 11/11 базовых стилей с пиксельным совпадением на одинаковом PCM и таймкоде;
+          58 подтверждённых кадров различных Looks, 2 Looks осциллоскопа не завершены из-за лимита времени.
+          Полный видеoэкспорт с сайта METHOD и физический iPhone этим тестом не подтверждены.
+          DOC
+          cd output/pack
+          zip -qr ../VISUALZI_STUDIO_v15_METHOD_SOURCE_v9_BACKUP.zip VISUALZI_STUDIO
+          cd ../..
+          python3 - <<'PY'
+          from zipfile import ZipFile
+          p='output/VISUALZI_STUDIO_v15_METHOD_SOURCE_v9_BACKUP.zip'
+          with ZipFile(p) as z:
+              test=z.testzip()
+              assert test is None, f'Corrupt member: {test}'
+              names=set(z.namelist())
+              for required in (
+                  'VISUALZI_STUDIO/beat-visual-studio-v15-original/index.html',
+                  'VISUALZI_STUDIO/beat-visual-studio-v15-original/method-shell-original.js',
+                  'VISUALZI_STUDIO/beat-visual-studio-v10/method-visual-engines.js',
+                  'VISUALZI_STUDIO/beat-visual-studio-v10/method-dancer.js',
+                  'VISUALZI_STUDIO/beat-visual-studio-v10/method-readout.js',
+                  'VISUALZI_STUDIO/beat-visual-studio-v10/method-oscilloscope.js',
+                  'VISUALZI_STUDIO/beat-visual-studio-v9/index.html',
+              ):
+                  assert required in names, f'Missing required dependency: {required}'
+              print('ZIP VERIFIED',len(names),'entries')
+          PY
+          ls -lh output/*.zip
+      - name: Deliver the ZIP archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: VISUALZI_STUDIO_v15_METHOD_SOURCE_v9_BACKUP
+          path: output/VISUALZI_STUDIO_v15_METHOD_SOURCE_v9_BACKUP.zip
+          if-no-files-found: error
+          retention-days: 30
