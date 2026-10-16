@@ -3,6 +3,13 @@ const f2=n=>Number(n).toFixed(2);
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const PREVIEW=()=>({pcm:new Float32Array(44100),sr:44100,duration:1});
 const App={view:'ws',vid:''};
+const AudioEngine={
+ has:false,pcm:null,ctx:null,alt:null,buf:null,
+ ensure(){if(!this.ctx)this.ctx=new (window.AudioContext||window.webkitAudioContext)();return this.ctx;},
+ setAlt(buffer){this.alt=buffer;},
+ setGain(){},on(){},emit(){},
+};
+window.METHOD_AUDIO_BRIDGE=AudioEngine;
 const h=(name,attrs)=>{const el=document.createElement(name);if(attrs)for(const [k,v] of Object.entries(attrs)){if(k==='class')el.className=v;else if(k==='html')el.innerHTML=v;else if(v!=null)el.setAttribute(k,v);}return el;};
 const ICON={reset:''};
 const commit=()=>{};
