@@ -3495,7 +3495,7 @@ Auth.on(u=>{ if(App.view!=='account') return; if(!u||u.id!==AccountPage.uid) Acc
    ===================================================================================================== */
 // TEMPORARY PRIVATE BETA AUTH BYPASS
 // REMOVE THIS BYPASS BEFORE PUBLIC LAUNCH
-const METHOD_PRIVATE_BETA_AUTH_BYPASS = false;   // Oct 15: off — the real accounts, Free / Licensed and render checks are back (testers get the license automatically)   // false = the normal METHOD: accounts, sign-in, Free / Licensed, server render checks
+const METHOD_PRIVATE_BETA_AUTH_BYPASS = true;   // Oct 15: off — the real accounts, Free / Licensed and render checks are back (testers get the license automatically)   // false = the normal METHOD: accounts, sign-in, Free / Licensed, server render checks
 /* While true, the private beta password screen is the only barrier. Behind it METHOD opens straight away, with
    no account and everything unlocked: every visualizer, Advanced, the premium looks, MIDI export, unlimited
    recordings and stills, no watermark. The sign-in service is never started, so nothing is read from or written
