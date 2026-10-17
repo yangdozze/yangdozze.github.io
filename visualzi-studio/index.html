@@ -652,7 +652,7 @@ body[data-view=account] .home-only,body[data-view=account] .ws-only:not(#crumb){
 
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#f4f6fa">
-<meta name="description" content="VISUALZI Studio — создавай музыкальные видео из аудио и MIDI. Настраивай стили, цвет, эффекты и экспорт.">
+<meta name="description" content="VISUALZI Studio v17 — визуализируй аудио и ноты MIDI. Настраивай стили, цвет, эффекты и экспорт.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='18' fill='%23385ee9'/%3E%3Cpath d='M13 17L29 47H36L52 17H43L33 36L23 17Z' fill='white'/%3E%3C/svg%3E">
 <style id="visualzi-ui-css">
 /* VISUALZI Studio — product interface only. Original engine and parameter contracts are unchanged. */
@@ -867,7 +867,7 @@ body.drawer-open #ws{grid-template-columns:116px minmax(0,1fr) 316px 338px}
 <div class="page-veil" id="pageVeil">Drop to load your track</div>
 <div class="toasts" id="toasts"></div>
 <div class="modal" id="modal"><div id="modalBody"></div></div>
-<input type="file" id="fileIn" accept="audio/*,.wav,.mp3,.m4a,.aac,.flac,.ogg,.opus,.aif,.aiff">
+<input type="file" id="fileIn" accept="audio/*,.wav,.mp3,.m4a,.aac,.flac,.ogg,.opus,.aif,.aiff,.mid,.midi">
 <input type="file" id="logoIn" accept="image/png,image/svg+xml,image/jpeg,image/webp,.png,.svg,.jpg,.jpeg,.webp">
 
 <script src="../beat-visual-studio-v15-original/method-config-original.js"></script>
@@ -879,7 +879,9 @@ body.drawer-open #ws{grid-template-columns:116px minmax(0,1fr) 316px 338px}
 <script>
 
 </script>
+<script src="./visualzi-signal-tracker.js?v=17"></script>
 <script src="../beat-visual-studio-v15-original/method-shell-original.js"></script>
+<script src="./visualzi-register-tracker.js?v=17"></script>
 <script id="visualzi-ui-controller">
 /* VISUALZI UI adapter. The original visual engines, post stack, recorder and parameter definitions stay intact. */
 (() => {
@@ -896,9 +898,9 @@ if (required.some(id => !document.getElementById(id)) || typeof ENGINES === 'und
 }
 
 const categories = {midi:[],audio:[]};
-for (const E of ENGINES) categories[E.id==='midi'?'midi':'audio'].push(E);
+for (const E of ENGINES) categories[(E.id==='midi'||E.id==='tracker')?'midi':'audio'].push(E);
 const sidebar = $('#vzSidebar'), navList = $('#vzNavList');
-const familyFor = E => E.id === 'midi' ? 'midi' : 'audio';
+const familyFor = E => (E.id === 'midi'||E.id === 'tracker') ? 'midi' : 'audio';
 const nameFor = E => E.name === 'MIDI / Score' ? 'MIDI / Score' : E.name;
 const make = (tag, className, text) => {
   const el = document.createElement(tag);
@@ -944,7 +946,7 @@ function applyFilter(name){
   }
   filterButtons.forEach(b => b.setAttribute('aria-pressed',String(b.dataset.vzFilter===filter)));
   const el = $('#vzLibraryCount');
-  if(el) el.textContent = filter==='midi'?'1 MIDI instrument':filter==='audio'?'10 audio instruments':'11 instruments';
+  if(el) el.textContent = filter==='midi'?`${categories.midi.length} MIDI styles`:filter==='audio'?`${categories.audio.length} audio styles`:`${ENGINES.length} styles`;
   try { localStorage.setItem(FILTER_KEY,filter); }catch(_e){}
 }
 filterButtons.forEach(b => b.addEventListener('click',()=>applyFilter(b.dataset.vzFilter)));
@@ -958,7 +960,7 @@ function syncNavigation(){
   if(caption) caption.textContent = id&&ENG[id] ? ENG[id].name : 'Твой бит. Твой визуал.';
   const newTitle = id&&ENG[id] ? ENG[id].name+' · VISUALZI Studio' : 'VISUALZI Studio — Beat Visualizer';
   document.title = newTitle;
-  if (id==='midi') sidebar.dataset.currentFamily='midi';
+  if (id==='midi'||id==='tracker') sidebar.dataset.currentFamily='midi';
   else sidebar.dataset.currentFamily='audio';
 }
 window.addEventListener('hashchange',() => setTimeout(syncNavigation,0));
