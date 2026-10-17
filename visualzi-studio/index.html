@@ -800,6 +800,9 @@ body.drawer-open #ws{grid-template-columns:116px minmax(0,1fr) 316px 338px}
 }
 @media(max-width:760px){.vz-sidebar .vz-navbtn{width:auto!important;justify-content:flex-start!important}.vz-sidebar #vzNavList{flex:0 0 max-content}}
 
+
+/* Show tracker demo without uploading audio; Track panel remains usable. */
+body.no-track.vz-tracker-demo .upcard{display:none!important}
 </style>
 <title>VISUALZI Studio — Beat Visualizer</title>
 <link rel="preconnect" href="https://fonts.googleapis.com/">
@@ -954,6 +957,7 @@ applyFilter(filter);
 
 function syncNavigation(){
   const id = (location.hash.match(/^#\/(\w+)/)||[])[1]||'';
+  document.body.classList.toggle('vz-tracker-demo',id==='tracker');
   all('.vz-navbtn').forEach(b=>b.classList.toggle('is-active', (b.dataset.engine||'')===id && (id!=='' || b===homeLink)));
   homeLink.classList.toggle('is-active',!id);
   const caption = $('#vzWorkspaceLabel');
