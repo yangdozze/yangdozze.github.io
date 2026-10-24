@@ -1,0 +1,35 @@
+name: METHOD source and configuration audit
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/method-source-audit.yml'
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Fetch LIVE METHOD controller
+        run: |
+          python - <<'PY'
+          import re,urllib.request,pathlib,json,hashlib
+          root=pathlib.Path('method-source-audit');root.mkdir(exist_ok=True)
+          req=urllib.request.Request('https://method.hiveglobal.org/app/',headers={'User-Agent':'Mozilla/5.0 NOXEN-QA'})
+          page=urllib.request.urlopen(req,timeout=45).read().decode('utf-8')
+          meta=re.search(r'<meta[^>]+name=["\']method-version["\'][^>]*>',page)
+          version=re.search(r'content=["\']([^"\']+)',meta.group(0)).group(1) if meta else None
+          sections=list(re.finditer(r'<script\\b([^>]*)>([\\s\\S]*?)</script>',page,re.I))
+          large=[(i,m.group(2)) for i,m in enumerate(sections) if len(m.group(2))>50000]
+          scriptmeta=[{'index':i,'length':len(s),'sha256':hashlib.sha256(s.encode()).hexdigest()} for i,s in large]
+          if len(large)<6:raise SystemExit(f'Expected six scripts, got {len(large)}')
+          root.joinpath('live_controller.js').write_text(large[-1][1],encoding='utf-8')
+          root.joinpath('audit.json').write_text(json.dumps({'version':version,'scripts':scriptmeta},indent=2),encoding='utf-8')
+          print(json.dumps({'version':version,'scripts':scriptmeta},indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: method-live-controller-${{ github.run_number }}
+          path: method-source-audit/
+          retention-days: 7
