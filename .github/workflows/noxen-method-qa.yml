@@ -28,7 +28,7 @@ jobs:
           from datetime import datetime, timezone
           from playwright.sync_api import sync_playwright
           target='https://method.hiveglobal.org/app/'
-          names=['MIDI','Retro','Bleach','Contour','Dust','Spatial','Volume','Dancer','Grid','Pads','Oscilloscope']
+          names=['Contour','Dust','Spatial','Volume','Dancer','Oscilloscope','MIDI','Retro','Bleach','Grid','Pads']
           output=pathlib.Path('method-qa-output')
           output.mkdir(exist_ok=True)
           report={'date':datetime.now(timezone.utc).isoformat(),'url':target,'version':None,'inline_scripts':[],'scenes':{},'errors':[],'note':'Playwright in GitHub Actions; screenshots are diagnostics, not proof of visual identity'}
@@ -52,11 +52,13 @@ jobs:
                   except Exception as e:
                       report['errors'].append('initial: '+str(e)[:400])
                       status=2
+                  browser.close()
                   for i,name in enumerate(names,1):
                       scene_page=None
                       try:
                           # A new page/context for every scene reduces accumulated GPU state and screenshot stalls.
-                          scene_page=browser.new_page(viewport={'width':960,'height':600},device_scale_factor=1)
+                          browser=p.chromium.launch(headless=True,args=['--no-sandbox','--disable-dev-shm-usage','--enable-unsafe-swiftshader'])
+                          scene_page=browser.new_page(viewport={'width':820,'height':540},device_scale_factor=1)
                           resp=scene_page.goto(target,wait_until='domcontentloaded',timeout=30000)
                           scene_page.wait_for_timeout(500)
                           item=scene_page.locator('button.card[aria-label="Open '+name+'"]')
@@ -68,10 +70,10 @@ jobs:
                           item.first.click(timeout=12000)
                           scene_page.wait_for_timeout(350)
                           # Opening and capturing are independently assessed.
-                          scene={'status':'opened','landed_url':scene_page.url,
-                            'heading':scene_page.locator('body').inner_text(timeout=8000)[:120],
-                            'canvas_count':scene_page.locator('canvas').count()}
+                          scene={'status':'opened','landed_url':scene_page.url}
                           report['scenes'][name]=scene
+                          try: scene['canvas_count']=scene_page.locator('canvas').count()
+                          except Exception as e: scene['canvas_error']=str(e)[:140]
                           try:
                               scene_page.screenshot(path=str(output/(f'{i:02d}_'+name.lower()+'.png')),
                                 animations='disabled',timeout=25000)
@@ -84,9 +86,8 @@ jobs:
                               report['scenes'][name]={'status':'error','message':str(e)[:330]}
                       finally:
                           if scene_page:
-                              try: scene_page.close()
+                              try: browser.close()
                               except Exception: pass
-                  browser.close()
           except Exception as e:
               status=2
               report['errors'].append('fatal: '+str(e)[:400])
