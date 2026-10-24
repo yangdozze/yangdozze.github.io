@@ -1,0 +1,39 @@
+name: METHOD gallery media mirror for NOXEN
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/method-gallery-media.yml'
+permissions:
+  contents: read
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    steps:
+      - name: Capture public previews
+        run: |
+          python - <<'PY'
+          import pathlib,urllib.request,json
+          root=pathlib.Path('app_media');root.mkdir(exist_ok=True)
+          names=['midi','retro','caustic','contour','dust','spatial','volume','dancer','grid','pads','scope']
+          result={}
+          for id in names:
+            result[id]={}
+            for ext in ['jpg','mp4']:
+              url=f'https://method.hiveglobal.org/assets/media/app/{id}.{ext}'
+              try:
+                req=urllib.request.Request(url,headers={'User-Agent':'Mozilla/5.0'})
+                b=urllib.request.urlopen(req,timeout=28).read()
+                if len(b)<300 or len(b)>35_000_000:raise ValueError('Unexpected preview size')
+                (root/f'{id}.{ext}').write_bytes(b)
+                result[id][ext]={'ok':True,'bytes':len(b)}
+              except Exception as e:result[id][ext]={'ok':False,'error':str(e)[:200]}
+          (root/'manifest.json').write_text(json.dumps(result,indent=2))
+          print(json.dumps(result,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: method-gallery-media-${{ github.run_number }}
+          path: app_media/
+          retention-days: 7
