@@ -27,7 +27,7 @@ jobs:
           import json, os, time, pathlib, traceback
           from datetime import datetime, timezone
           from playwright.sync_api import sync_playwright
-          target='https://method.hiveglobal.org/app/#/caustic'
+          target='https://method.hiveglobal.org/app/'
           names=['MIDI','Retro','Bleach','Contour','Dust','Spatial','Volume','Dancer','Grid','Pads','Oscilloscope']
           output=pathlib.Path('method-qa-output')
           output.mkdir(exist_ok=True)
@@ -42,10 +42,13 @@ jobs:
                   try:
                       response=page.goto(target,wait_until='domcontentloaded',timeout=35000)
                       report['http_status']=response.status if response else None
+                      report['landed_url']=page.url
+                      report['body_excerpt']=(page.locator('body').inner_text(timeout=8000))[:900]
                       page.wait_for_timeout(3000)
                       report['version']=page.locator('meta[name="method-version"]').first.get_attribute('content',timeout=2000) if page.locator('meta[name="method-version"]').count() else None
                       report['inline_scripts']=page.evaluate("""() => [...document.scripts].map((s,index)=>{const t=s.textContent||'';if(t.length<50000)return null;let h=2166136261>>>0;for(let j=0;j<t.length;j++)h=Math.imul(h^t.charCodeAt(j),16777619)>>>0;return {index,chars:t.length,fnv1a32:h.toString(16).padStart(8,'0')}}).filter(Boolean)""")
                       page.screenshot(path=str(output/'00_gallery.png'),timeout=12000)
+                      report['gallery_buttons']=page.locator('button.card[aria-label]').evaluate_all('(xs)=>xs.map(x=>({label:x.getAttribute("aria-label"),visible:!!(x.offsetWidth||x.offsetHeight||x.getClientRects().length)}))')
                   except Exception as e:
                       report['errors'].append('initial: '+str(e)[:400])
                       status=2
@@ -59,17 +62,19 @@ jobs:
                           if item.count()==0:
                               report['scenes'][name]='missing_card'
                               continue
-                          item.first.click(timeout=7000)
+                          item.first.click(timeout=9000)
                           page.wait_for_timeout(700)
                           page.screenshot(path=str(output/(f'{i:02d}_'+name.lower()+'.png')),timeout=12000)
-                          report['scenes'][name]='opened'
+                          report['scenes'][name]={'status':'opened','landed_url':page.url,'heading':(page.locator('body').inner_text(timeout=4000))[:95]}
                       except Exception as e:
-                          report['scenes'][name]='error: '+str(e)[:180]
+                          report['scenes'][name]='error: '+str(e)[:260]
+                          try: page.screenshot(path=str(output/(f'{i:02d}_'+name.lower()+'_FAILED.png')),timeout=7000)
+                          except Exception: pass
                   browser.close()
           except Exception as e:
               status=2
               report['errors'].append('fatal: '+str(e)[:400])
-          opened=sum(1 for v in report['scenes'].values() if v=='opened')
+          opened=sum(1 for v in report['scenes'].values() if isinstance(v,dict) and v.get('status')=='opened')
           md=['# METHOD real-browser audit',f'Date: {report["date"]}',f'Live METHOD version: {report["version"]}',f'Opened styles: {opened}/11',f'Large inline script fingerprints: {len(report["inline_scripts"])}',f'Errors: {len(report["errors"])}','','## Styles']
           for k,v in report['scenes'].items(): md.append(f'- {k}: {v}')
           md.extend(['','## Engine script fingerprints'])
