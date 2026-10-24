@@ -1,0 +1,92 @@
+name: NOXEN - Live METHOD visual QA
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/noxen-method-qa.yml'
+  schedule:
+    - cron: '37 3 * * *'
+permissions:
+  contents: read
+jobs:
+  method-browser-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Chromium testing tools
+        run: |
+          python -m pip install 'playwright>=1.50,<2'
+          python -m playwright install --with-deps chromium
+      - name: Audit current METHOD in real browser
+        run: |
+          python - <<'PY'
+          import json, os, time, pathlib, traceback
+          from datetime import datetime, timezone
+          from playwright.sync_api import sync_playwright
+          target='https://method.hiveglobal.org/app/#/caustic'
+          names=['MIDI','Retro','Bleach','Contour','Dust','Spatial','Volume','Dancer','Grid','Pads','Oscilloscope']
+          output=pathlib.Path('method-qa-output')
+          output.mkdir(exist_ok=True)
+          report={'date':datetime.now(timezone.utc).isoformat(),'url':target,'version':None,'inline_scripts':[],'scenes':{},'errors':[],'note':'Playwright in GitHub Actions; screenshots are diagnostics, not proof of visual identity'}
+          status=0
+          try:
+              with sync_playwright() as p:
+                  browser=p.chromium.launch(headless=True,args=['--no-sandbox','--disable-dev-shm-usage','--enable-unsafe-swiftshader'])
+                  page=browser.new_page(viewport={'width':1280,'height':800},device_scale_factor=1)
+                  page.on('pageerror',lambda e:report['errors'].append('page: '+str(e)[:250]))
+                  page.on('console',lambda m:report['errors'].append('console: '+m.text[:250]) if m.type=='error' else None)
+                  try:
+                      response=page.goto(target,wait_until='domcontentloaded',timeout=35000)
+                      report['http_status']=response.status if response else None
+                      page.wait_for_timeout(3000)
+                      report['version']=page.locator('meta[name="method-version"]').first.get_attribute('content',timeout=2000) if page.locator('meta[name="method-version"]').count() else None
+                      report['inline_scripts']=page.evaluate("""() => [...document.scripts].map((s,index)=>{const t=s.textContent||'';if(t.length<50000)return null;let h=2166136261>>>0;for(let j=0;j<t.length;j++)h=Math.imul(h^t.charCodeAt(j),16777619)>>>0;return {index,chars:t.length,fnv1a32:h.toString(16).padStart(8,'0')}}).filter(Boolean)""")
+                      page.screenshot(path=str(output/'00_gallery.png'),timeout=12000)
+                  except Exception as e:
+                      report['errors'].append('initial: '+str(e)[:400])
+                      status=2
+                  for i,name in enumerate(names,1):
+                      try:
+                          page.goto(target,wait_until='domcontentloaded',timeout=25000)
+                          page.wait_for_timeout(1100)
+                          item=page.locator('button.card[aria-label="Open '+name+'"]')
+                          if item.count()==0:
+                              item=page.locator('button.card[aria-label*="'+name+'"]')
+                          if item.count()==0:
+                              report['scenes'][name]='missing_card'
+                              continue
+                          item.first.click(timeout=7000)
+                          page.wait_for_timeout(700)
+                          page.screenshot(path=str(output/(f'{i:02d}_'+name.lower()+'.png')),timeout=12000)
+                          report['scenes'][name]='opened'
+                      except Exception as e:
+                          report['scenes'][name]='error: '+str(e)[:180]
+                  browser.close()
+          except Exception as e:
+              status=2
+              report['errors'].append('fatal: '+str(e)[:400])
+          opened=sum(1 for v in report['scenes'].values() if v=='opened')
+          md=['# METHOD real-browser audit',f'Date: {report["date"]}',f'Live METHOD version: {report["version"]}',f'Opened styles: {opened}/11',f'Large inline script fingerprints: {len(report["inline_scripts"])}',f'Errors: {len(report["errors"])}','','## Styles']
+          for k,v in report['scenes'].items(): md.append(f'- {k}: {v}')
+          md.extend(['','## Engine script fingerprints'])
+          for s in report['inline_scripts']:md.append(f'- script {s["index"]}: {s["chars"]} chars / FNV-1a {s["fnv1a32"]}')
+          md.extend(['','Screenshots and JSON are attached as workflow artifact. Cloud Chromium may use software GPU; this does not prove 60 FPS on the target device.'])
+          output.joinpath('report.md').write_text('\n'.join(md)+'\n',encoding='utf-8')
+          output.joinpath('report.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')
+          if os.environ.get('GITHUB_STEP_SUMMARY'):
+              with open(os.environ['GITHUB_STEP_SUMMARY'],'a',encoding='utf-8') as f:f.write('\n'.join(md)+'\n')
+          print('\n'.join(md))
+          if opened<6:status=3
+          raise SystemExit(status)
+          PY
+      - name: Upload screenshots, hashes and diagnostic report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: method-qa-run-${{ github.run_number }}
+          path: method-qa-output/
+          retention-days: 14
